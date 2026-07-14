@@ -1,0 +1,9 @@
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Office 잠금 파일
+~$*
+
+# Claude Code 내부 세션 데이터
+.omc/

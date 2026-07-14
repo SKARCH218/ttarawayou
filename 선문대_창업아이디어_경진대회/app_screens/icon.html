@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>따라와유 App Icon</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@700;900&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #E8E8E8;
+    display: flex; align-items: center; justify-content: center;
+    width: 512px; height: 512px;
+    font-family: 'Noto Sans KR', sans-serif;
+  }
+
+  #icon {
+    width: 512px; height: 512px;
+    background: #2D3F37;
+    border-radius: 114px;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    position: relative; overflow: hidden;
+    gap: 0;
+  }
+
+  /* 배경 미묘한 원형 그라데이션 */
+  #icon::before {
+    content: '';
+    position: absolute;
+    width: 320px; height: 320px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(92,122,110,0.3) 0%, transparent 70%);
+    top: 96px; left: 96px;
+    pointer-events: none;
+  }
+
+  .content {
+    position: relative; z-index: 2;
+    display: flex; flex-direction: column;
+    align-items: center;
+  }
+
+  /* 맵핀 */
+  .pin {
+    width: 44px; height: 44px;
+    margin-bottom: 18px;
+  }
+
+  /* 눈 컨테이너 */
+  .eyes {
+    display: flex;
+    gap: 28px;
+    margin-bottom: 14px;
+  }
+
+  .eye {
+    width: 88px; height: 88px;
+    background: #E07856;
+    border-radius: 50%;
+    position: relative;
+  }
+
+  /* 눈 하이라이트 */
+  .eye::before {
+    content: '';
+    position: absolute;
+    width: 24px; height: 24px;
+    background: rgba(255,255,255,0.9);
+    border-radius: 50%;
+    top: 14px; left: 14px;
+  }
+
+  /* 눈 동공 */
+  .eye::after {
+    content: '';
+    position: absolute;
+    width: 36px; height: 36px;
+    background: rgba(0,0,0,0.25);
+    border-radius: 50%;
+    top: 26px; left: 26px;
+  }
+
+  /* 부리 */
+  .beak {
+    width: 0; height: 0;
+    border-left: 10px solid transparent;
+    border-right: 10px solid transparent;
+    border-top: 14px solid #E07856;
+    margin-bottom: 22px;
+  }
+
+  /* 텍스트 */
+  .app-name {
+    font-size: 52px; font-weight: 900;
+    color: #F5E6D3;
+    letter-spacing: -1px;
+    line-height: 1;
+  }
+  .app-sub {
+    font-size: 13px; font-weight: 700;
+    color: rgba(224,120,86,0.85);
+    letter-spacing: 3px;
+    margin-top: 7px;
+  }
+</style>
+</head>
+<body>
+<div id="icon">
+  <div class="content">
+    <!-- 지도 핀 SVG -->
+    <svg class="pin" viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M22 4C15.373 4 10 9.373 10 16C10 24 22 40 22 40C22 40 34 24 34 16C34 9.373 28.627 4 22 4Z" fill="#E07856"/>
+      <circle cx="22" cy="16" r="5.5" fill="#2D3F37"/>
+    </svg>
+
+    <!-- 눈 두 개 -->
+    <div class="eyes">
+      <div class="eye"></div>
+      <div class="eye"></div>
+    </div>
+
+    <!-- 부리 -->
+    <div class="beak"></div>
+
+    <!-- 텍스트 -->
+    <div class="app-name">따라와유</div>
+    <div class="app-sub">Tarawayou</div>
+  </div>
+</div>
+</body>
+</html>
