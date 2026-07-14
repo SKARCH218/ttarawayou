@@ -10,6 +10,8 @@
 
 🏆 **2026 충남권 고교-대학 창업아이디어 경진대회** 본선 **2위 (최우수상)** 수상
 
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
+
 </div>
 
 ---
@@ -240,6 +242,22 @@ node screenshot.js
 > **"우리는 여행을 팔지 않습니다. 우리는 '결정 부담 없는 휴식'을 팝니다."**
 >
 > **따라가기만 하세요. 나머지는 AI가 합니다.**
+
+---
+
+## 📜 라이선스
+
+이 프로젝트는 **Apache License 2.0** 하에 배포됩니다. 자세한 내용은 [LICENSE](./LICENSE) 파일을 참조하세요.
+
+```
+Copyright 2026 Kims & Lee Team (김태훈, 김재원, 김준서, 이윤호)
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+```
 
 ---
 
