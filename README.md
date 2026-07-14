@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="선문대_창업아이디어_경진대회/app_screens/icon.png" width="140" alt="따라와유 아이콘"/>
+<img src="선문대_창업아이디어_경진대회/icon.png" width="200" alt="따라와유 아이콘"/>
 
 # 따라와유 (Tarawayou)
 
