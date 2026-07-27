@@ -1,0 +1,25 @@
+server:
+  port: 8080
+  address: 0.0.0.0
+
+spring:
+  datasource:
+    url: jdbc:h2:mem:tripdb;DB_CLOSE_DELAY=-1
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    open-in-view: false
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+
+# ODsay 대중교통 API 키 (없으면 거리 기반 추정으로 자동 폴백)
+odsay:
+  api-key: ${ODSAY_API_KEY:}
+
+osrm:
+  base-url: https://router.project-osrm.org
