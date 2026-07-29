@@ -72,9 +72,23 @@
     <div class="dbg-side-body" id="dbgBody">디버그 훅 대기 중…</div>
   </aside>
 
-  <script src="https://apis.openapi.sk.com/tmap/jsv2?version=1&appKey=YOUR_TMAP_APP_KEY"></script>
-  <script src="js/common.js?v=20"></script>
-  <script src="js/map.js?v=20"></script>
-  <script src="js/debug-map.js?v=20"></script>
+  <script>
+    // TMAP SDK 동기 로드 — 앱키는 백엔드(/api/config)에서 받는다.
+    // (jsv2 로더가 내부적으로 document.write를 쓰므로 파싱 시점에 심어야 한다)
+    (function () {
+      try {
+        var xhr = new XMLHttpRequest();
+        xhr.open('GET', location.protocol + '//' + location.hostname + ':8080/api/config', false);
+        xhr.send(null);
+        var key = (JSON.parse(xhr.responseText).tmapAppKey || '').trim();
+        if (!key) throw new Error('empty key');
+        document.write('<script src="https://apis.openapi.sk.com/tmap/jsv2?version=1&appKey='
+          + encodeURIComponent(key) + '"><\/script>');
+      } catch (e) { window.__tmapSdkFailed = true; }
+    })();
+  </script>
+  <script src="js/common.js?v=22"></script>
+  <script src="js/map.js?v=22"></script>
+  <script src="js/debug-map.js?v=22"></script>
 </body>
 </html>

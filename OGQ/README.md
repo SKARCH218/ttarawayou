@@ -17,34 +17,27 @@
 서버 시작 시 경주 **숙박업소 50곳 + 식당 50곳 + 관광지 50곳** 시드 데이터가 자동 삽입됩니다
 (황리단길·교촌·보문단지·불국사·감포·양남 등 실제 지역대 좌표 사용).
 
-## 실행 방법 (Windows)
+## 실행 방법 (Windows) — 새 PC에서도 키만 넣으면 끝
 
-가장 쉬운 방법 — 프로젝트 폴더의 배치 파일을 더블클릭:
+**준비물: Java 21+ 와 Node.js만 설치** (Maven 불필요 — Maven Wrapper가 자동 빌드)
 
-1. **`run-backend.bat`** → Spring API 서버 (8080, ODsay 키 자동 설정)
-2. **`run-frontend.bat`** → 웹 서버 (3000, 최초 실행 시 npm install 자동)
-3. **`restart-servers.bat`** → 실행 중인 서버 전부 끄고 셋 다 새로 시작 (코드 수정 후 반영용)
-4. **`stop-servers.bat`** → 실행 중인 서버 전부 종료
-5. **`run-debug.bat`** → 디버깅 웹 (3030) — 폰 프레임 오른쪽에 전체 여정 패널 +
-   경로를 따라 초당 10m 자동 이동. 일반 앱(3000)에는 디버깅 기능이 전혀 없다
+1. `run-backend.bat`을 메모장으로 열어 **`TMAP_APP_KEY=`에 본인 SK open API 앱키 입력** (필수).
+   ODsay·data.go.kr 키는 선택 — 없으면 해당 부가기능만 자동 폴백된다.
+   지도 웹페이지는 이 키를 백엔드(`/api/config`)에서 받아 쓰므로 **다른 파일은 수정할 필요 없음**.
+2. **`run-backend.bat`** 더블클릭 → 첫 실행이면 자동으로 빌드(몇 분) 후 8080 기동
+3. **`run-frontend.bat`** 더블클릭 → 웹 서버 (3000, 최초 실행 시 npm install 자동)
+4. 브라우저에서 `http://localhost:3000`
 
-> ⚠️ 명령을 직접 칠 때는 반드시 **프로젝트 폴더 안에서** 실행해야 합니다.
-> `ODSAY_API_KEY=키 java -jar ...` 같은 한 줄 문법은 리눅스/맥 전용이라 Windows에서는 동작하지 않습니다.
+기타 배치 파일:
+- **`restart-servers.bat`** → 전부 끄고 셋 다 재시작 (코드 수정 후 반영용)
+- **`stop-servers.bat`** → 전부 종료
+- **`run-debug.bat`** → 디버깅 웹 (3030): 전체 여정 패널·가상 시계·배속·자동 이동
+  (일반 앱 3000에는 디버깅 기능 없음)
 
-수동 실행 (PowerShell, 프로젝트 폴더에서):
+TMAP 앱키 발급: [openapi.sk.com](https://openapi.sk.com) 가입 → 앱 생성 →
+상품 이용신청(TMAP, TMAP 대중교통) → 앱키 복사.
 
-```bash
-$env:ODSAY_API_KEY='YOUR_ODSAY_API_KEY'; java -jar backend/target/mystery-trip-api-0.0.1-SNAPSHOT.jar
-```
-
-수동 실행 (cmd, 프로젝트 폴더에서):
-
-```bash
-set ODSAY_API_KEY=YOUR_ODSAY_API_KEY&& java -jar backend\target\mystery-trip-api-0.0.1-SNAPSHOT.jar
-```
-
-키를 지정하지 않으면 거리 기반 추정으로 자동 폴백합니다.
-다시 빌드하려면 (Maven 필요): `mvn -f backend/pom.xml -DskipTests package`
+수동 빌드가 필요하면 (프로젝트 폴더에서): `cd backend && .\mvnw.cmd -DskipTests package`
 
 ### 웹 서버 수동 실행 (3000)
 

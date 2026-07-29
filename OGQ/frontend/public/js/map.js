@@ -8,8 +8,18 @@
  * - 경로 이탈(40m 초과) 시 경고 배너
  */
 (function init() {
-  // TMAP SDK가 비동기 로드되므로 준비될 때까지 대기
+  // TMAP SDK는 map.html의 동기 로더가 백엔드(/api/config) 앱키로 심어준다.
+  // 여기서는 준비될 때까지 대기하고, 실패 시 안내만 한다.
   if (!(window.Tmapv2 && window.Tmapv2.Map)) {
+    const el = document.getElementById('statusSub');
+    if (window.__tmapSdkFailed) {
+      if (el) el.textContent = '지도 키를 불러오지 못했어요 — 백엔드(8080)와 TMAP_APP_KEY를 확인해 주세요';
+    } else {
+      if (!window.__tmapInitAt) window.__tmapInitAt = Date.now();
+      else if (Date.now() - window.__tmapInitAt > 12000 && el) {
+        el.textContent = '지도 로딩이 늦어지고 있어요 — 네트워크를 확인해 주세요';
+      }
+    }
     setTimeout(init, 60);
     return;
   }
