@@ -4,14 +4,15 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>미스터리 트립 — 길 따라가기</title>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <link rel="stylesheet" href="css/style.css?v=12" />
+  <link rel="stylesheet" href="css/style.css?v=20" />
 </head>
 <body>
   <div class="phone">
     <div class="app">
       <div class="map-shell">
         <div id="map"></div>
+        <!-- 지도 입력(드래그·휠·핀치) 완전 차단 오버레이 -->
+        <div id="mapLock" style="position:absolute; inset:0; z-index:500;"></div>
 
         <div class="map-topbar">
           <button class="map-back" id="backBtn">‹</button>
@@ -46,8 +47,8 @@
     </div>
   </div>
 
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="js/common.js?v=12"></script>
-  <script src="js/map.js?v=12"></script>
+  <script src="https://apis.openapi.sk.com/tmap/jsv2?version=1&appKey=YOUR_TMAP_APP_KEY"></script>
+  <script src="js/common.js?v=20"></script>
+  <script src="js/map.js?v=20"></script>
 </body>
 </html>

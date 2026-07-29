@@ -4,7 +4,6 @@ import com.mysterytrip.dto.PlanDtos.*;
 import com.mysterytrip.entity.Place;
 import com.mysterytrip.entity.Place.PlaceType;
 import com.mysterytrip.entity.Wallet;
-import com.mysterytrip.repository.PlaceRepository;
 import com.mysterytrip.repository.WalletRepository;
 import org.springframework.stereotype.Service;
 
@@ -32,17 +31,18 @@ public class PlanService {
     private static final int ATTRACTION_MIN = 60;    // 관광지 이용 시간
     private static final int TRANSIT_WAIT_MIN = 7;   // 버스 대기 시간(평균 배차 가정)
 
-    private final PlaceRepository repository;
     private final RouteService routeService;
     private final AiPlanService aiPlanService;
     private final WalletRepository walletRepository;
+    private final PlaceProviderService placeProvider;
 
-    public PlanService(PlaceRepository repository, RouteService routeService,
-                       AiPlanService aiPlanService, WalletRepository walletRepository) {
-        this.repository = repository;
+    public PlanService(RouteService routeService,
+                       AiPlanService aiPlanService, WalletRepository walletRepository,
+                       PlaceProviderService placeProvider) {
         this.routeService = routeService;
         this.aiPlanService = aiPlanService;
         this.walletRepository = walletRepository;
+        this.placeProvider = placeProvider;
     }
 
     public PlanResponse createPlan(PlanRequest req) {
@@ -66,14 +66,17 @@ public class PlanService {
         long foodBudget = dayTrip ? budget * 35 / 100 : budget * 20 / 100;
         long transportBudget = budget * 10 / 100;
 
-        // 기준점(앵커): 사용자 위치 → 없으면 경주 시내(대릉원)
-        double anchorLat = req.startLatitude() != null ? req.startLatitude() : 35.8378;
-        double anchorLng = req.startLongitude() != null ? req.startLongitude() : 129.2116;
+        // 기준점(앵커): 사용자 위치 → 없으면 기본 지역(서울 시청)
+        double anchorLat = req.startLatitude() != null ? req.startLatitude() : 37.5665;
+        double anchorLng = req.startLongitude() != null ? req.startLongitude() : 126.9780;
+
+        // 장소 후보: 기준점 주변을 TMAP POI로 실시간 조회 (전국)
+        PlaceProviderService.Pool pool = placeProvider.places(anchorLat, anchorLng);
 
         // ---------- 1차: 로컬 AI(LM Studio)에게 플랜 요청 ----------
         List<Place> aiCatalog = dayTrip
-                ? repository.findAll().stream().filter(p -> p.getType() != PlaceType.LODGING).toList()
-                : repository.findAll();
+                ? pool.all().stream().filter(p -> p.getType() != PlaceType.LODGING).toList()
+                : pool.all();
         AiPlanService.AiSelection ai = aiPlanService.plan(budget, days, people, nights, aiCatalog);
 
         Place lodging;              // 당일치기면 null
@@ -89,15 +92,15 @@ public class PlanService {
         } else {
             // ---------- 폴백: 휴리스틱 ----------
             lodging = dayTrip ? null
-                    : pickLodging(repository.findByType(PlaceType.LODGING), nights, lodgingBudget);
+                    : pickLodging(pool.lodgings(), nights, lodgingBudget);
             double cLat = lodging != null ? lodging.getLatitude() : anchorLat;
             double cLng = lodging != null ? lodging.getLongitude() : anchorLng;
 
             List<Place> attractions = pickPlaces(
-                    repository.findByType(PlaceType.ATTRACTION), cLat, cLng,
+                    pool.attractions(), cLat, cLng,
                     attractionBudget, people, days * 3);
             List<Place> restaurants = pickPlaces(
-                    repository.findByType(PlaceType.RESTAURANT), cLat, cLng,
+                    pool.restaurants(), cLat, cLng,
                     foodBudget, people, days * 3);
 
             List<List<Place>> attractionsByDay = splitByDay(
@@ -116,11 +119,24 @@ public class PlanService {
         }
 
         long lodgingSpent = lodging == null ? 0 : (long) lodging.getPrice() * nights;
-        long attractionSpent = spentOf(perDay, PlaceType.ATTRACTION, people);
-        long foodSpent = spentOf(perDay, PlaceType.RESTAURANT, people);
+
+        // 일자별 출발 시각: 1일차는 현재 시각(밤·새벽이면 09:00), 이후 날은 09:00
+        List<java.time.LocalTime> dayStarts = new ArrayList<>();
+        for (int d = 0; d < days; d++) {
+            if (d == 0) {
+                java.time.LocalTime now = java.time.LocalTime.now(java.time.ZoneId.of("Asia/Seoul"));
+                now = now.withMinute(now.getMinute() / 5 * 5).withSecond(0).withNano(0);
+                boolean sane = !now.isBefore(java.time.LocalTime.of(8, 0))
+                        && !now.isAfter(java.time.LocalTime.of(19, 0));
+                dayStarts.add(sane ? now : java.time.LocalTime.of(9, 0));
+            } else {
+                dayStarts.add(java.time.LocalTime.of(9, 0));
+            }
+        }
 
         // ---------- 일자별 동선·이동 구간 생성 ----------
         List<DayPlanDto> dayPlans = new ArrayList<>();
+        List<List<Place>> usedPerDay = new ArrayList<>(); // 실제 일정에 들어간 장소(식사 슬롯 반영)
         long transportSpent = 0;
         for (int d = 0; d < days; d++) {
             List<Place> dayPlaces = perDay.get(d);
@@ -147,11 +163,12 @@ public class PlanService {
                 startType = "START";
             }
 
-            // AI 순서는 존중하되 식당 연속 배치만 보정, 휴리스틱은 식사(아침/점심/저녁)를
-            // 관광지 사이사이에 끼워 넣어 연속 식당이 생기지 않게 구성한다
+            // 식사는 08/12/17시 슬롯 근처에만 배치하고, 이미 지난 슬롯의 끼니는 생략한다.
+            // AI 순서는 존중하되 연속 식당 보정 + 슬롯 수만큼만 식당 유지
             List<Place> ordered = aiOrdered
-                    ? fixConsecutiveMeals(new ArrayList<>(dayPlaces))
-                    : buildDaySequence(startLat, startLng, dayPlaces);
+                    ? trimMealsToSlots(fixConsecutiveMeals(new ArrayList<>(dayPlaces)), dayStarts.get(d))
+                    : buildDaySequenceTimed(startLat, startLng, dayPlaces, dayStarts.get(d));
+            usedPerDay.add(ordered);
 
             List<StopDto> stops = new ArrayList<>();
             boolean startIsLodging = "LODGING".equals(startType);
@@ -200,19 +217,8 @@ public class PlanService {
                 legs.add(leg);
             }
 
-            // 일정표 시각 계산:
-            // - 1일차는 현재 시각(5분 단위 반올림) 출발, 밤·새벽이면 09:00 / 나머지 날은 09:00
-            // - 버스 구간은 평균 대기 7분 포함, 식당 50분·관광지 60분 체류 반영
-            java.time.LocalTime clock;
-            if (d == 0) {
-                java.time.LocalTime now = java.time.LocalTime.now(java.time.ZoneId.of("Asia/Seoul"));
-                now = now.withMinute(now.getMinute() / 5 * 5).withSecond(0).withNano(0);
-                boolean sane = !now.isBefore(java.time.LocalTime.of(8, 0))
-                        && !now.isAfter(java.time.LocalTime.of(19, 0));
-                clock = sane ? now : java.time.LocalTime.of(9, 0);
-            } else {
-                clock = java.time.LocalTime.of(9, 0);
-            }
+            // 일정표 시각 계산 — 버스 구간은 평균 대기 7분 포함, 식당 50분·관광지 60분 체류 반영
+            java.time.LocalTime clock = dayStarts.get(d);
             for (int i = 0; i < legs.size(); i++) {
                 java.time.LocalTime depart = clock;
                 int moveMin = legs.get(i).durationMinutes()
@@ -230,6 +236,9 @@ public class PlanService {
             dayPlans.add(new DayPlanDto(d + 1, stops, legs, dayCost));
         }
 
+        // 실제 일정에 들어간 장소 기준으로 비용 계산 (생략된 끼니는 비용에서 제외)
+        long attractionSpent = spentOf(usedPerDay, PlaceType.ATTRACTION, people);
+        long foodSpent = spentOf(usedPerDay, PlaceType.RESTAURANT, people);
         long totalCost = lodgingSpent + attractionSpent + foodSpent + transportSpent;
         BudgetBreakdown breakdown = new BudgetBreakdown(
                 lodgingBudget, attractionBudget, foodBudget, transportBudget,
@@ -375,55 +384,86 @@ public class PlanService {
         return p.getType() == PlaceType.RESTAURANT;
     }
 
+    /** 식사 슬롯 기준 시각: 아침 08:00 / 점심 12:00 / 저녁 17:00 */
+    private static final java.time.LocalTime[] MEAL_SLOTS = {
+            java.time.LocalTime.of(8, 0),
+            java.time.LocalTime.of(12, 0),
+            java.time.LocalTime.of(17, 0),
+    };
+
+    /** 출발 시각 기준으로 아직 챙길 수 있는 식사 슬롯 (1시간 이상 지난 슬롯은 생략) */
+    private static List<java.time.LocalTime> mealSlots(java.time.LocalTime dayStart) {
+        List<java.time.LocalTime> out = new ArrayList<>();
+        for (java.time.LocalTime slot : MEAL_SLOTS) {
+            if (!dayStart.isAfter(slot.plusMinutes(60))) out.add(slot);
+        }
+        return out;
+    }
+
+    /** AI가 정한 순서에서 식당을 슬롯 개수까지만 남긴다 (지나간 끼니 생략) */
+    private List<Place> trimMealsToSlots(List<Place> seq, java.time.LocalTime dayStart) {
+        int allowed = mealSlots(dayStart).size();
+        List<Place> out = new ArrayList<>();
+        int meals = 0;
+        for (Place p : seq) {
+            if (isMeal(p)) {
+                if (meals >= allowed) continue;
+                meals++;
+            }
+            out.add(p);
+        }
+        return out;
+    }
+
     /**
-     * 하루 시퀀스 구성: 아침 식사 → 관광지 전반부 → 점심 → 관광지 후반부 → 저녁.
-     * 식당이 연속으로 나오지 않고 관광지 사이에 자연스럽게 끼어든다.
+     * 하루 시퀀스 구성 (시간 기반):
+     * 시계를 굴리며 08/12/17시 슬롯이 다가오면 가까운 식당을, 아니면 다음 관광지를 넣는다.
+     * 출발이 늦어 지난 슬롯의 끼니는 자동 생략된다.
      */
-    private List<Place> buildDaySequence(double startLat, double startLng, List<Place> dayPlaces) {
+    private List<Place> buildDaySequenceTimed(double startLat, double startLng,
+                                              List<Place> dayPlaces,
+                                              java.time.LocalTime dayStart) {
         List<Place> meals = new ArrayList<>(dayPlaces.stream().filter(PlanService::isMeal).toList());
-        List<Place> sights = nearestNeighborOrder(startLat, startLng,
-                dayPlaces.stream().filter(p -> !isMeal(p)).toList());
+        List<Place> sights = new ArrayList<>(nearestNeighborOrder(startLat, startLng,
+                dayPlaces.stream().filter(p -> !isMeal(p)).toList()));
+        List<java.time.LocalTime> slots = new ArrayList<>(mealSlots(dayStart));
 
         List<Place> seq = new ArrayList<>();
+        java.time.LocalTime clock = dayStart;
         double curLat = startLat, curLng = startLng;
 
-        // 아침
-        double[] c0 = addNearestMeal(seq, meals, curLat, curLng);
-        curLat = c0[0]; curLng = c0[1];
-        // 관광지 전반부
-        int half = (int) Math.ceil(sights.size() / 2.0);
-        for (int i = 0; i < half; i++) {
-            seq.add(sights.get(i));
-            curLat = sights.get(i).getLatitude();
-            curLng = sights.get(i).getLongitude();
-        }
-        // 점심
-        double[] c1 = addNearestMeal(seq, meals, curLat, curLng);
-        curLat = c1[0]; curLng = c1[1];
-        // 관광지 후반부
-        for (int i = half; i < sights.size(); i++) {
-            seq.add(sights.get(i));
-            curLat = sights.get(i).getLatitude();
-            curLng = sights.get(i).getLongitude();
-        }
-        // 저녁 (남은 식당 전부 — 보통 1개)
-        while (!meals.isEmpty()) {
-            double[] c2 = addNearestMeal(seq, meals, curLat, curLng);
-            curLat = c2[0]; curLng = c2[1];
+        while (!sights.isEmpty() || (!slots.isEmpty() && !meals.isEmpty())) {
+            boolean mealDue = !slots.isEmpty() && !meals.isEmpty()
+                    && !clock.isBefore(slots.get(0).minusMinutes(45));
+            if (mealDue || sights.isEmpty()) {
+                if (slots.isEmpty() || meals.isEmpty()) break;
+                // 슬롯보다 이르면 슬롯 시각까지 기다렸다 먹는 것으로 간주
+                if (clock.isBefore(slots.get(0))) clock = slots.get(0);
+                double fLat = curLat, fLng = curLng;
+                Place m = meals.stream().min(Comparator.comparingDouble(p ->
+                                GeoUtil.distanceMeters(fLat, fLng, p.getLatitude(), p.getLongitude())))
+                        .orElseThrow();
+                meals.remove(m);
+                slots.remove(0);
+                clock = clock.plusMinutes(travelMinutes(curLat, curLng, m) + MEAL_MIN);
+                seq.add(m);
+                curLat = m.getLatitude();
+                curLng = m.getLongitude();
+            } else {
+                Place s = sights.remove(0);
+                clock = clock.plusMinutes(travelMinutes(curLat, curLng, s) + ATTRACTION_MIN);
+                seq.add(s);
+                curLat = s.getLatitude();
+                curLng = s.getLongitude();
+            }
         }
         return fixConsecutiveMeals(seq);
     }
 
-    /** 현재 위치에서 가장 가까운 식당을 시퀀스에 추가하고 새 좌표를 반환 */
-    private double[] addNearestMeal(List<Place> seq, List<Place> meals, double lat, double lng) {
-        if (meals.isEmpty()) return new double[]{lat, lng};
-        Place m = meals.stream()
-                .min(Comparator.comparingDouble(p ->
-                        GeoUtil.distanceMeters(lat, lng, p.getLatitude(), p.getLongitude())))
-                .orElseThrow();
-        meals.remove(m);
-        seq.add(m);
-        return new double[]{m.getLatitude(), m.getLongitude()};
+    /** 시퀀스 계획용 이동 시간 추정 (800m 이하 도보, 그 외 대중교통 평균) */
+    private static int travelMinutes(double fromLat, double fromLng, Place to) {
+        double d = GeoUtil.distanceMeters(fromLat, fromLng, to.getLatitude(), to.getLongitude());
+        return (int) Math.max(3, d <= 800 ? d / 67 : d / 400 + 7);
     }
 
     /** 식당이 연속으로 붙어 있으면 뒤쪽의 비식당 장소를 사이에 끼워 넣는다 */

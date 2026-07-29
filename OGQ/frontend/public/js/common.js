@@ -6,7 +6,7 @@
 const API_BASE = `${location.protocol}//${location.hostname}:8080`;
 
 function formatWon(n) {
-  return `${Math.round(n).toLocaleString('ko-KR')}원`;
+  return `${Math.round(n).toLocaleString('ko-KR')}토큰`;
 }
 
 function savePlan(plan) {

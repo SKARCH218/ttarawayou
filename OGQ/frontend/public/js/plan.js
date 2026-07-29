@@ -38,23 +38,39 @@
     );
   });
 
-  // Day 버튼 — 장소 이름 대신 개수·소요 정보만 노출
+  // Day 버튼 — 장소 이름 대신 개수·소요 정보만 노출.
+  // 순차 진행: 이전 일차를 완료해야 다음 일차가 열린다
+  const doneDay = Number(sessionStorage.getItem('mysteryDoneDay') || 0);
   const dayList = document.getElementById('dayList');
   plan.dayPlans.forEach((day) => {
     const mysterySpots = day.stops.filter(
       (s, i) => i > 0 && !(i === day.stops.length - 1 && s.type === 'LODGING')
     ).length;
     const totalMinutes = day.legs.reduce((sum, l) => sum + l.durationMinutes, 0);
+    const startAt = day.legs[0]?.departAt || '09:00';
+    const completed = day.day <= doneDay;
+    const locked = day.day > doneDay + 1;
+
     const btn = document.createElement('button');
-    btn.className = 'day-btn';
+    btn.className = 'day-btn' + (locked ? ' locked' : '');
+    let infoLine;
+    if (completed) {
+      infoLine = `✅ 완료한 여정 · 다시 보기`;
+    } else if (locked) {
+      infoLine = `🔒 Day ${day.day - 1} 완료 후 열려요 · ${startAt} 시작 예정`;
+    } else {
+      infoLine = `${startAt} 시작 · 비밀 장소 ${mysterySpots}곳 · 이동 약 ${totalMinutes}분 · ${formatWon(day.dayCost)}`;
+    }
     btn.innerHTML = `
-      <span class="day-num">D${day.day}</span>
+      <span class="day-num">${locked ? '🔒' : completed ? '✅' : 'D' + day.day}</span>
       <span class="day-info">
-        <b>Day ${day.day} 여정 따라가기</b>
-        <span>비밀 장소 ${mysterySpots}곳 · 이동 약 ${totalMinutes}분 · ${formatWon(day.dayCost)}</span>
+        <b>Day ${day.day} 여정 ${completed ? '(완료)' : '따라가기'}</b>
+        <span>${infoLine}</span>
       </span>
       <span class="arrow">›</span>`;
-    btn.addEventListener('click', () => (location.href = `map.html?day=${day.day}`));
+    if (!locked) {
+      btn.addEventListener('click', () => (location.href = `map.html?day=${day.day}`));
+    }
     dayList.appendChild(btn);
   });
 

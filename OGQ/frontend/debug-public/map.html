@@ -4,9 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>🛠️ 미스터리 트립 — 디버깅 (3030)</title>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <link rel="stylesheet" href="css/style.css?v=12" />
-  <link rel="stylesheet" href="css/debug.css?v=12" />
+  <link rel="stylesheet" href="css/style.css?v=20" />
+  <link rel="stylesheet" href="css/debug.css?v=20" />
   <script>
     // map.js보다 먼저 실행: 디버그 훅 활성화 + 실제 GPS 차단(시뮬레이션이 위치를 공급)
     window.__MT_DEBUG__ = true;
@@ -21,6 +20,8 @@
     <div class="app">
       <div class="map-shell">
         <div id="map"></div>
+        <!-- 지도 입력(드래그·휠·핀치) 완전 차단 오버레이 -->
+        <div id="mapLock" style="position:absolute; inset:0; z-index:500;"></div>
 
         <div class="map-topbar">
           <button class="map-back" id="backBtn">‹</button>
@@ -59,14 +60,21 @@
   <aside class="dbg-side" id="dbgSide">
     <div class="dbg-side-head">
       <b>🛠️ 디버깅 — Day <span id="dbgDay">?</span></b>
-      <span class="dbg-sim" id="dbgSim">▶ 10m/s 자동 이동</span>
+      <span style="display:flex; gap:8px; align-items:center;">
+        <span class="dbg-speed" id="dbgSpeed">
+          <button data-mult="1" class="on">×1</button><button data-mult="2">×2</button><button data-mult="4">×4</button><button data-mult="8">×8</button>
+        </span>
+        <span class="dbg-sim" id="dbgClock"
+              style="color:#ffd479; border-color:rgba(255,212,121,.4); background:rgba(255,212,121,.1);">🕐 --:--</span>
+        <span class="dbg-sim" id="dbgSim">▶ 10m/s 자동 이동</span>
+      </span>
     </div>
     <div class="dbg-side-body" id="dbgBody">디버그 훅 대기 중…</div>
   </aside>
 
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="js/common.js?v=12"></script>
-  <script src="js/map.js?v=12"></script>
-  <script src="js/debug-map.js?v=12"></script>
+  <script src="https://apis.openapi.sk.com/tmap/jsv2?version=1&appKey=YOUR_TMAP_APP_KEY"></script>
+  <script src="js/common.js?v=20"></script>
+  <script src="js/map.js?v=20"></script>
+  <script src="js/debug-map.js?v=20"></script>
 </body>
 </html>

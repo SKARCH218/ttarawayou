@@ -54,6 +54,8 @@ public class Place {
     }
 
     public Long getId() { return id; }
+    /** TMAP 등 외부 소스에서 만든 비영속 장소에 식별자를 부여할 때 사용 */
+    public void setId(Long id) { this.id = id; }
     public String getName() { return name; }
     public PlaceType getType() { return type; }
     public String getAddress() { return address; }

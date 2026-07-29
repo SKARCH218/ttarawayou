@@ -38,6 +38,7 @@ public class RouteService {
     private final String osrmBaseUrl;
     private final PublicBusService publicBusService;
     private final IntercityBusService intercityBusService;
+    private final TmapService tmapService;
     private final Map<String, LegDto> cache = new ConcurrentHashMap<>();
 
     /** 이 직선거리(m)를 넘는 이동은 시외로 보고 시외버스 정보를 결합한다 */
@@ -46,11 +47,13 @@ public class RouteService {
     public RouteService(@Value("${odsay.api-key}") String odsayKey,
                         @Value("${osrm.base-url}") String osrmBaseUrl,
                         PublicBusService publicBusService,
-                        IntercityBusService intercityBusService) {
+                        IntercityBusService intercityBusService,
+                        TmapService tmapService) {
         this.odsayKey = odsayKey == null ? "" : odsayKey.trim();
         this.osrmBaseUrl = osrmBaseUrl;
         this.publicBusService = publicBusService;
         this.intercityBusService = intercityBusService;
+        this.tmapService = tmapService;
         SimpleClientHttpRequestFactory f = new SimpleClientHttpRequestFactory();
         f.setConnectTimeout(3000);
         f.setReadTimeout(5000);
@@ -76,6 +79,13 @@ public class RouteService {
     // ---------- OSRM 도보 ----------
 
     private LegDto fetchWalk(double fromLat, double fromLng, double toLat, double toLng) {
+        // 1순위: TMAP 보행자 경로 (한국 보행로 데이터)
+        TmapService.WalkRoute tw = tmapService.walkRoute(fromLat, fromLng, toLat, toLng);
+        if (tw != null) {
+            return new LegDto("WALK", tw.distanceMeters(), tw.minutes(), 0,
+                    "도보 " + fmtKm(tw.distanceMeters()), tw.path());
+        }
+        // 2순위: OSRM
         try {
             String url = String.format(Locale.US,
                     "%s/route/v1/foot/%f,%f;%f,%f?overview=full&geometries=geojson",
@@ -103,8 +113,10 @@ public class RouteService {
     // ---------- ODsay 대중교통 ----------
 
     private LegDto fetchTransit(double fromLat, double fromLng, double toLat, double toLng) {
-        LegDto leg = null;
-        if (!odsayKey.isEmpty()) {
+        // 1순위: TMAP 대중교통 (경로좌표·요금·환승 포함)
+        LegDto leg = tmapService.transitLeg(fromLat, fromLng, toLat, toLng);
+        // 2순위: ODsay
+        if (leg == null && !odsayKey.isEmpty()) {
             try {
                 leg = fetchOdsay(fromLat, fromLng, toLat, toLng);
             } catch (Exception e) {

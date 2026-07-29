@@ -171,6 +171,7 @@
       }
       const plan = await res.json();
       savePlan(plan);
+      sessionStorage.removeItem('mysteryDoneDay'); // 새 플랜 → 일차 진행 초기화
       location.href = 'plan.html';
     } catch (e) {
       showError(`플랜 생성 실패: ${e.message}`);

@@ -12,31 +12,93 @@
     return;
   }
 
-  const SPEED_M_PER_S = 10;   // 초당 이동 거리
-  const TICK_MS = 250;        // 부드럽게 4틱/초 → 틱당 2.5m
-  const STEP_M = SPEED_M_PER_S * (TICK_MS / 1000);
+  const WALK_SPEED_M_PER_S = 10;     // 도보 구간: 초당 10m
+  const TRANSIT_SPEED_M_PER_S = 100; // 대중교통 구간: 초당 100m
+  const TICK_MS = 250;               // 4틱/초
 
   const fmtDist = (m) => (m >= 1000 ? `${(m / 1000).toFixed(1)}km` : `${Math.round(m)}m`);
   const fmtMin = (min) => (min >= 60 ? `${Math.floor(min / 60)}시간 ${min % 60}분` : `${min}분`);
-  const won = (n) => Number(n).toLocaleString('ko-KR') + '원';
+  const won = (n) => Number(n).toLocaleString('ko-KR') + '토큰';
   const esc = (t) => String(t ?? '').replace(/</g, '&lt;');
 
   // ---------- 전체 경로 상시 표시 ----------
-  L.polyline(mt.legs.flatMap((l) => l.path), {
-    color: '#ffb86b', weight: 4, opacity: .8, dashArray: '6 8',
-  }).addTo(mt.map);
+  mt.addLine(mt.legs.flatMap((l) => l.path), { color: '#ffb86b', weight: 4, opacity: .8, dash: true });
 
   // ---------- 시뮬레이션: 초당 10m 자동 이동 ----------
   let simLeg = -1;
   let segIdx = 0, segT = 0;
   let pos = null;
-  let arrivalTimer = null;
+  let legLen = 0;      // 현재 구간 전체 길이(m)
+  let traveled = 0;    // 현재 구간에서 이동한 거리(m) — 가상 시계 보간용
+
+  // 대중교통 구간 내 위상 경계: 승차 지점까지의 거리 / 하차 지점까지의 거리
+  let boardDistM = -1;
+  let alightDistM = Infinity;
 
   function resetToLeg(legIdx) {
     simLeg = legIdx;
     segIdx = 0;
     segT = 0;
-    pos = [...mt.legs[legIdx].path[0]];
+    traveled = 0;
+    const leg = mt.legs[legIdx];
+    const pts = leg.path;
+    pos = [...pts[0]];
+    // 누적 거리 계산 + 승차/하차 지점의 경로상 위치 찾기
+    legLen = 0;
+    boardDistM = -1;
+    alightDistM = Infinity;
+    const board = leg.boardLat != null ? [leg.boardLat, leg.boardLng]
+      : (Array.isArray(leg.stations) && leg.stations.length ? leg.stations[0] : null);
+    const alight = leg.alightLat != null ? [leg.alightLat, leg.alightLng]
+      : (Array.isArray(leg.stations) && leg.stations.length ? leg.stations[leg.stations.length - 1] : null);
+    let bBest = Infinity, aBest = Infinity;
+    let cum = 0;
+    for (let i = 0; i < pts.length; i++) {
+      if (i > 0) cum += distanceMeters(pts[i - 1][0], pts[i - 1][1], pts[i][0], pts[i][1]);
+      if (leg.mode === 'TRANSIT') {
+        if (board) {
+          const db = distanceMeters(pts[i][0], pts[i][1], board[0], board[1]);
+          if (db < bBest) { bBest = db; boardDistM = cum; }
+        }
+        if (alight) {
+          const da = distanceMeters(pts[i][0], pts[i][1], alight[0], alight[1]);
+          if (da < aBest) { aBest = da; alightDistM = cum; }
+        }
+      }
+    }
+    legLen = cum;
+    // 승차/하차 좌표가 없는 대중교통 구간은 전체를 탑승으로 간주
+    if (leg.mode === 'TRANSIT' && !board) boardDistM = 0;
+  }
+
+  // ---------- 가상 시계: 일정표 시각 + 구간 진행률 보간 ----------
+  const toMin = (s) => {
+    const m = /^(\d{1,2}):(\d{2})$/.exec(s || '');
+    return m ? Number(m[1]) * 60 + Number(m[2]) : null;
+  };
+  const fmtClock = (min) =>
+    `${String(Math.floor(min / 60) % 24).padStart(2, '0')}:${String(Math.floor(min % 60)).padStart(2, '0')}`;
+
+  function updateClock() {
+    const el = $('dbgClock');
+    if (!el) return;
+    let text = '--:--';
+    if (mt.finished) {
+      text = mt.legs[mt.legs.length - 1]?.arriveAt || '--:--';
+    } else {
+      const l = mt.legs[simLeg >= 0 ? simLeg : mt.currentLeg];
+      const dep = toMin(l?.departAt);
+      const arr = toMin(l?.arriveAt);
+      if (dep != null && arr != null) {
+        if (mt.overlayOpen) {
+          text = l.arriveAt; // 도착해서 머무는 중
+        } else {
+          const frac = legLen > 0 ? Math.min(1, traveled / legLen) : 0;
+          text = fmtClock(dep + frac * Math.max(0, arr - dep));
+        }
+      }
+    }
+    el.textContent = '🕐 ' + text;
   }
 
   function advance(meters) {
@@ -59,28 +121,55 @@
     const [aLat, aLng] = pts[Math.min(segIdx, pts.length - 1)];
     const [bLat, bLng] = pts[Math.min(segIdx + 1, pts.length - 1)];
     pos = [aLat + (bLat - aLat) * segT, aLng + (bLng - aLng) * segT];
+    traveled += meters - remain; // 실제 이동량 누적 (가상 시계 보간용)
   }
+
+  // 배속 (×1 / ×2 / ×4 / ×8)
+  let speedMult = 1;
+  document.querySelectorAll('#dbgSpeed button').forEach((b) => {
+    b.addEventListener('click', () => {
+      speedMult = Number(b.dataset.mult) || 1;
+      document.querySelectorAll('#dbgSpeed button').forEach((x) =>
+        x.classList.toggle('on', x === b));
+    });
+  });
 
   let stallTicks = 0;
   let lastPosKey = '';
+  let lastTickAt = performance.now();
 
   setInterval(() => {
+    // 탭 스로틀링과 무관하게 정확한 속도를 내도록 경과 시간 기반으로 이동
+    const now = performance.now();
+    const dt = Math.min(2, (now - lastTickAt) / 1000);
+    lastTickAt = now;
     if (mt.finished) {
       $('dbgSim').textContent = '■ 여정 완료';
+      updateClock();
       return;
     }
-    // 도착 팝업이 떠 있으면 1초 후 자동으로 다음 구간 진행
+    // 도착 팝업이 떠 있는 동안은 이동을 멈춘다 (다음 구간은 직접 버튼을 눌러 진행)
     if (mt.overlayOpen) {
-      if (!arrivalTimer) {
-        arrivalTimer = setTimeout(() => {
-          document.getElementById('revealNext').click();
-          arrivalTimer = null;
-        }, 1000);
-      }
+      updateClock();
+      $('dbgSim').textContent = '⏸ 도착 — 팝업에서 다음 진행';
       return;
     }
     if (simLeg !== mt.currentLeg) resetToLeg(mt.currentLeg);
-    advance(STEP_M);
+    // 속도: 기본 10m/s, 승차 지점~하차 지점 사이(탑승 중)에만 100m/s
+    let speed = WALK_SPEED_M_PER_S;
+    let label = '▶ 🚶 10m/s 이동';
+    if (mt.legs[simLeg]?.mode === 'TRANSIT') {
+      if (traveled < boardDistM) {
+        label = '▶ 🚶 10m/s (승차 지점으로)';
+      } else if (traveled < alightDistM) {
+        speed = TRANSIT_SPEED_M_PER_S;
+        label = '▶ 🚌 100m/s (탑승 중)';
+      } else {
+        label = '▶ 🚶 10m/s (하차 후 도보)';
+      }
+    }
+    $('dbgSim').textContent = label + (speedMult > 1 ? ` ×${speedMult}` : '');
+    advance(speed * speedMult * dt);
 
     // 안전장치: 경로 끝에 도달했는데 도착 판정이 안 나서 2초 이상 제자리면
     // 목적지 좌표로 직접 스냅해 도착을 강제한다
@@ -93,6 +182,7 @@
       stallTicks = 0;
     }
 
+    updateClock();
     mt.onPosition(pos[0], pos[1]);
   }, TICK_MS);
 

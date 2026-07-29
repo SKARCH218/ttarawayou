@@ -7,54 +7,90 @@
  * - 반경 20m 도착 순간에만 장소 이름 공개
  * - 경로 이탈(40m 초과) 시 경고 배너
  */
-(() => {
+(function init() {
+  // TMAP SDK가 비동기 로드되므로 준비될 때까지 대기
+  if (!(window.Tmapv2 && window.Tmapv2.Map)) {
+    setTimeout(init, 60);
+    return;
+  }
   const plan = loadPlan();
   const day = Number(new URLSearchParams(location.search).get('day') || 1);
   if (!plan || !plan.dayPlans[day - 1]) {
     location.replace(plan ? 'plan.html' : 'index.html');
     return;
   }
+  // 순차 진행: 이전 일차를 완료해야 이 일차를 열 수 있다
+  const doneDayGate = Number(sessionStorage.getItem('mysteryDoneDay') || 0);
+  if (day > doneDayGate + 1) {
+    location.replace('plan.html');
+    return;
+  }
   const dayPlan = plan.dayPlans[day - 1];
   const stops = dayPlan.stops;
   const legs = dayPlan.legs;
 
-  const ZOOM = 19;             // OSM 타일 원본 최대 줌 (선명함, 화면 가로 약 100m)
+  const ZOOM = 18;             // TMAP 고배율 줌 (한국 상세 지도)
   const ARRIVE_RADIUS = 20;    // 도착 판정 반경(m)
   const OFFROUTE_DIST = 40;    // 경로 이탈 판정(m)
   const FAR_OFF_DIST = 250;    // 이만큼 크게 벗어나면 구간 종류와 무관하게 재탐색(m)
   const REVEAL_AHEAD = 130;    // 앞으로 공개할 경로 길이(m)
   const REROUTE_DIST = 30;     // 계획된 출발점과 이만큼 떨어져 있으면 재계산(m)
 
-  // ---------- 지도: 줌 완전 잠금 ----------
+  // ---------- 지도: TMAP SDK (줌 완전 잠금은 #mapLock 오버레이가 입력을 차단) ----------
   const start = stops[0];
-  const map = L.map('map', {
-    center: [start.latitude, start.longitude],
+  const TL = (lat, lng) => new Tmapv2.LatLng(lat, lng);
+  const map = new Tmapv2.Map('map', {
+    center: TL(start.latitude, start.longitude),
+    width: '100%',
+    height: '100%',
     zoom: ZOOM,
-    minZoom: ZOOM,           // minZoom = maxZoom → 줌 고정
-    maxZoom: ZOOM,
-    zoomControl: false,      // 줌 버튼 제거
-    scrollWheelZoom: false,  // 휠 줌 차단
-    doubleClickZoom: false,  // 더블클릭 줌 차단
-    touchZoom: false,        // 핀치 줌 차단
-    boxZoom: false,
-    keyboard: false,
-    dragging: false,         // 드래그 차단 (항상 내 위치 중심)
-    attributionControl: true,
-    renderer: L.svg({ padding: 2 }), // 초고배율 줌에서 화면 밖 경로가 잘리지 않게 넓게 렌더링
+    zoomControl: false,
+    scrollwheel: false,
   });
-  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: ZOOM,
-    maxNativeZoom: 19, // OSM 타일은 z19까지 → ZOOM을 더 올리면 확대 렌더링됨
-    attribution: '&copy; OpenStreetMap contributors',
-  }).addTo(map);
 
-  const userMarker = L.marker([start.latitude, start.longitude], {
-    icon: L.divIcon({ className: '', html: '<div class="user-marker"></div>', iconSize: [22, 22], iconAnchor: [11, 11] }),
-    interactive: false,
-  }).addTo(map);
+  function setCenter(lat, lng) {
+    map.setCenter(TL(lat, lng));
+  }
 
-  const revealedPath = L.polyline([], { color: '#8d7bff', weight: 7, opacity: 0.95, lineCap: 'round' }).addTo(map);
-  const walkedPath = L.polyline([], { color: '#3d3763', weight: 5, opacity: 0.7, dashArray: '2 8' }).addTo(map);
+  /** HTML 마커 생성 (이모지·배지·사용자 점) */
+  function htmlMarker(lat, lng, html, w, h) {
+    return new Tmapv2.Marker({
+      position: TL(lat, lng),
+      iconHTML: html,
+      iconSize: new Tmapv2.Size(w, h),
+      map,
+    });
+  }
+
+  /** Leaflet 호환 폴리라인 래퍼 (setLatLngs로 갱신) */
+  function makeLine(opts) {
+    let line = null;
+    return {
+      setLatLngs(pts) {
+        if (line) { line.setMap(null); line = null; }
+        if (!pts || pts.length < 2) return;
+        line = new Tmapv2.Polyline({
+          path: pts.map((p) => TL(p[0], p[1])),
+          strokeColor: opts.color,
+          strokeWeight: opts.weight,
+          strokeOpacity: opts.opacity ?? 1,
+          strokeStyle: opts.dash ? 'dash' : 'solid',
+          map,
+        });
+      },
+    };
+  }
+
+  const userMarkerObj = htmlMarker(start.latitude, start.longitude,
+    '<div class="user-marker"></div>', 22, 22);
+  const userMarker = {
+    pos: [start.latitude, start.longitude],
+    setLatLng(ll) { this.pos = [ll[0], ll[1]]; userMarkerObj.setPosition(TL(ll[0], ll[1])); },
+    getLatLng() { return { lat: this.pos[0], lng: this.pos[1] }; },
+  };
+
+  const revealedPath = makeLine({ color: '#8d7bff', weight: 7, opacity: 0.95 });
+  const walkedPath = makeLine({ color: '#3d3763', weight: 5, opacity: 0.7, dash: true });
 
   // ---------- 상태 ----------
   let currentLeg = 0;          // 지금 따라가는 구간 인덱스 (목적지는 stops[currentLeg+1])
@@ -151,15 +187,11 @@
    * - 대중교통 구간: 승차 🚏 / 하차 🚏 정류장
    */
   function updateLegMarkers() {
-    legMarkers.forEach((m) => map.removeLayer(m));
+    legMarkers.forEach((m) => m.setMap(null));
     legMarkers = [];
     if (finished) return;
     const mk = (lat, lng, html) => {
-      const m = L.marker([lat, lng], {
-        icon: L.divIcon({ className: '', html, iconSize: [60, 34], iconAnchor: [30, 30] }),
-        interactive: false,
-      }).addTo(map);
-      legMarkers.push(m);
+      legMarkers.push(htmlMarker(lat, lng, html, 60, 34));
     };
     const badge = (emoji, label, color) =>
       `<div style="text-align:center; filter:drop-shadow(0 2px 5px rgba(0,0,0,.7));">`
@@ -336,7 +368,7 @@
   async function onPosition(lat, lng) {
     if (finished || overlayOpen) return;
     userMarker.setLatLng([lat, lng]);
-    map.setView([lat, lng], ZOOM, { animate: true });
+    setCenter(lat, lng);
 
     if (!rerouteChecked) await rerouteFromHere(lat, lng);
     if (rerouting) return;
@@ -395,13 +427,19 @@
         if (dist < nd) { nd = dist; ni = i; }
       });
       const boardD = distanceMeters(lat, lng, curLeg.stations[0][0], curLeg.stations[0][1]);
-      ridingBus = ni >= 1 && boardD > 120; // 승차 정류장을 지나 노선 위를 이동 중
+      const lastSt = curLeg.stations[curLeg.stations.length - 1];
+      // 하차 정류장을 80m 이상 지나쳤으면 하차 완료 → 배지 제거
+      const pastAlight = ni >= curLeg.stations.length - 1
+        && distanceMeters(lat, lng, lastSt[0], lastSt[1]) > 80;
+      ridingBus = ni >= 1 && boardD > 120 && !pastAlight;
       if (ridingBus) {
         const remain = curLeg.stations.length - 1 - ni;
         $('busArrival').textContent = remain > 0
           ? `🚌 탑승 중 · 하차까지 ${remain}개 정류장 (하차: ${curLeg.alightStop || '안내 참고'})`
           : `🚌 곧 하차! ${curLeg.alightStop ? curLeg.alightStop + '에서 내리세요' : '다음 정류장에서 내리세요'}`;
         $('busArrival').style.display = 'block';
+      } else if (pastAlight) {
+        $('busArrival').style.display = 'none';
       }
     } else {
       ridingBus = false;
@@ -439,15 +477,9 @@
     $('revealOverlay').classList.add('show');
 
     // 공개된 장소에는 마커를 남긴다
-    L.marker([stop.latitude, stop.longitude], {
-      icon: L.divIcon({
-        className: '',
-        html: `<div style="font-size:26px; filter:drop-shadow(0 2px 6px rgba(0,0,0,.6));">${info.emoji}</div>`,
-        iconSize: [30, 30],
-        iconAnchor: [15, 15],
-      }),
-      interactive: false,
-    }).addTo(map);
+    htmlMarker(stop.latitude, stop.longitude,
+      `<div style="font-size:26px; filter:drop-shadow(0 2px 6px rgba(0,0,0,.6));">${info.emoji}</div>`,
+      30, 30);
   }
 
   $('revealNext').addEventListener('click', () => {
@@ -456,10 +488,17 @@
     currentLeg += 1;
     if (currentLeg >= legs.length) {
       finished = true;
+      // 일차 완료 기록 → 플랜 화면에서 다음 일차가 열린다
+      const doneDay = Math.max(day, Number(sessionStorage.getItem('mysteryDoneDay') || 0));
+      sessionStorage.setItem('mysteryDoneDay', String(doneDay));
+      const next = plan.dayPlans[day]; // day는 1부터라 인덱스 day = 다음 일차
       $('statusSub').textContent = '오늘 여정을 모두 마쳤어요! 🎉';
-      $('mysteryHint').innerHTML = '<span style="font-size:20px;">🎉</span><span>모든 비밀 장소를 찾았어요! 플랜 화면으로 돌아가 다음 날을 이어가 보세요.</span>';
+      $('mysteryHint').innerHTML = next
+        ? `<span style="font-size:20px;">🎉</span><span>Day ${day} 완료! 다음 여정(Day ${day + 1})은 `
+          + `<b>${next.legs?.[0]?.departAt || '09:00'}</b>에 시작해요. 푹 쉬고 만나요!</span>`
+        : '<span style="font-size:20px;">🏆</span><span>모든 여정을 완료했어요! 미스터리 여행 끝!</span>';
       revealedPath.setLatLngs([]);
-      setTimeout(() => (location.href = 'plan.html'), 2600);
+      setTimeout(() => (location.href = 'plan.html'), 3200);
       return;
     }
     updateProgressPill();
@@ -505,6 +544,12 @@
   if (window.__MT_DEBUG__) {
     window.__mt = {
       map, plan, day, stops, legs, TYPE_INFO,
+      /** 디버그용 폴리라인 추가 (pts: [[lat,lng],...]) */
+      addLine(pts, opts) {
+        const line = makeLine(opts || { color: '#ffb86b', weight: 4, opacity: .8, dash: true });
+        line.setLatLngs(pts);
+        return line;
+      },
       get currentLeg() { return currentLeg; },
       get finished() { return finished; },
       get overlayOpen() { return overlayOpen; },

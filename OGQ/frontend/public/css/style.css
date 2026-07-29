@@ -252,6 +252,8 @@ h1.title {
 .day-btn .day-info b { font-size: 15.5px; }
 .day-btn .day-info span { display: block; font-size: 12px; color: #8f8ab8; margin-top: 3px; }
 .day-btn .arrow { color: #5c5590; font-size: 20px; }
+.day-btn.locked { opacity: .45; cursor: not-allowed; }
+.day-btn.locked:active { transform: none; border-color: #2f2c52; }
 
 /* ============ 지도 화면 ============ */
 .map-shell { position: relative; flex: 1; overflow: hidden; }

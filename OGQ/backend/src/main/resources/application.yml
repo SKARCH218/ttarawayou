@@ -29,6 +29,11 @@ osrm:
 datago:
   api-key: ${DATA_GO_KR_API_KEY:}
 
+# SK open API (TMAP) — 보행자/대중교통 길찾기 + 전국 POI(관광지·숙소·음식점)
+# 키가 없으면 OSRM/ODsay/경주 시드 데이터로 자동 폴백
+tmap:
+  app-key: ${TMAP_APP_KEY:}
+
 # LM Studio 로컬 AI (OpenAI 호환 API). 꺼져 있거나 실패하면 휴리스틱 알고리즘으로 자동 폴백
 lmstudio:
   base-url: ${LMSTUDIO_BASE_URL:http://10.8.2.5:1234/v1}
