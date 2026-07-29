@@ -1,0 +1,36 @@
+server:
+  port: 8080
+  address: 0.0.0.0
+
+spring:
+  datasource:
+    url: jdbc:h2:mem:tripdb;DB_CLOSE_DELAY=-1
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    open-in-view: false
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+
+# ODsay 대중교통 API 키 (없으면 거리 기반 추정으로 자동 폴백)
+odsay:
+  api-key: ${ODSAY_API_KEY:}
+
+osrm:
+  base-url: https://router.project-osrm.org
+
+# 공공데이터포털(data.go.kr) 인증키 — 국토교통부(TAGO) 버스노선정보로 경주 버스 경로 구성
+# 키가 없으면 ODsay 정류장 목록으로 자동 폴백
+datago:
+  api-key: ${DATA_GO_KR_API_KEY:}
+
+# LM Studio 로컬 AI (OpenAI 호환 API). 꺼져 있거나 실패하면 휴리스틱 알고리즘으로 자동 폴백
+lmstudio:
+  base-url: ${LMSTUDIO_BASE_URL:http://10.8.2.5:1234/v1}
+  model: ${LMSTUDIO_MODEL:google/gemma-4-26b-a4b}
+  enabled: ${LMSTUDIO_ENABLED:true}

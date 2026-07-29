@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>미스터리 트립 — 비밀 플랜</title>
+  <link rel="stylesheet" href="css/style.css?v=12" />
+</head>
+<body>
+  <div class="phone">
+    <div class="app">
+      <div class="screen">
+        <p class="brand">Secret Itinerary</p>
+        <div class="mystery-badge">🎁</div>
+        <h1 class="title">플랜이 완성됐어요!</h1>
+        <p class="subtitle">어디로 가는지는 비밀이에요.<br />지도가 알려주는 길을 그대로 따라가 보세요.</p>
+        <p class="subtitle" id="plannerBadge" style="margin-top:6px; font-size:12px; color:#6f6a9c;"></p>
+
+        <div class="card">
+          <div class="cost-row">
+            <span class="k">총 예산</span>
+            <span class="v" id="budgetTotal">—</span>
+          </div>
+          <div class="cost-row">
+            <span class="k">예상 총비용</span>
+            <span class="v big" id="totalCost">—</span>
+          </div>
+          <div class="cost-row">
+            <span class="k">남는 예산</span>
+            <span class="v accent" id="remaining">—</span>
+          </div>
+          <div class="cost-row">
+            <span class="k">🪙 남은 토큰</span>
+            <span class="v" id="tokenBalance" style="color:#ffd479;">—</span>
+          </div>
+        </div>
+
+        <div class="card bar-group" id="barGroup">
+          <div style="font-size:13px; font-weight:700; color:#a49ed1;">예산 배분 사용률</div>
+        </div>
+
+        <div class="day-list" id="dayList"></div>
+
+        <button class="btn-ghost" id="resetBtn" style="margin-top:18px;">← 예산 다시 입력하기</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/common.js?v=12"></script>
+  <script src="js/plan.js?v=12"></script>
+</body>
+</html>
