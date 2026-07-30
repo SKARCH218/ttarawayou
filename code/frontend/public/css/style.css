@@ -285,6 +285,115 @@ h1.title {
 .day-btn .day-info b { font-size: 15.5px; }
 .day-btn .day-info span { display: block; font-size: var(--ogq-text-caption-size); color: var(--ogq-color-mono-500); margin-top: 3px; }
 .day-btn .arrow { color: var(--ogq-color-mono-300); font-size: 20px; }
+/* ============ 인트로 (앱 진입 스플래시) ============ */
+.intro {
+  position: absolute; inset: 0; z-index: 900;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 18px; background: var(--ogq-color-mono-000);
+  transition: opacity .45s var(--ogq-easing-default), visibility .45s;
+}
+.intro.hide { opacity: 0; visibility: hidden; pointer-events: none; }
+.intro-symbol {
+  width: 132px;
+  opacity: 0; transform: translateY(10px) scale(.94);
+  animation: introIn .7s var(--ogq-easing-default) forwards;
+}
+.intro-wordmark {
+  width: 116px;
+  opacity: 0; animation: introIn .6s var(--ogq-easing-default) .28s forwards;
+}
+.intro-tagline {
+  font-size: 13.5px; color: var(--ogq-color-mono-500); letter-spacing: -0.01em;
+  opacity: 0; animation: introIn .6s var(--ogq-easing-default) .5s forwards;
+}
+@keyframes introIn {
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+/* 로고를 헤더에 쓸 때 */
+.brand-logo { display: block; width: 92px; margin: 0 auto var(--ogq-spacing-3); }
+
+/* ============ 질문형 온보딩 (한 화면에 질문 하나) ============ */
+.ask-screen {
+  flex: 1; display: flex; flex-direction: column;
+  /* 상단은 노치·다이나믹 아일랜드를 피해 여유를 둔다 */
+  padding: 52px 22px 28px;
+}
+.ask-progress {
+  display: flex; gap: 5px; margin-bottom: 8px;
+}
+.ask-progress i {
+  flex: 1; height: 3px; border-radius: 99px; background: var(--ogq-color-mono-100);
+  transition: background .25s var(--ogq-easing-default);
+}
+.ask-progress i.on { background: var(--ogq-color-primary-500); }
+.ask-count {
+  font-size: 12px; color: var(--ogq-color-mono-400); text-align: right;
+  font-weight: var(--ogq-font-weight-semibold);
+}
+/* 이모지를 화면 정가운데에, 질문은 그 아래 */
+.ask-body {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 20px;
+}
+.ask-emoji {
+  font-size: 76px; line-height: 1;
+  animation: askEmoji .45s var(--ogq-easing-default);
+}
+@keyframes askEmoji {
+  from { opacity: 0; transform: translateY(8px) scale(.9); }
+  to { opacity: 1; transform: none; }
+}
+.ask-question {
+  font-size: 21px; font-weight: var(--ogq-font-weight-bold);
+  color: var(--ogq-color-mono-990); text-align: center; line-height: 1.45;
+  letter-spacing: -0.02em;
+}
+.ask-hint {
+  font-size: 13px; color: var(--ogq-color-mono-500); text-align: center; margin-top: -10px;
+}
+.ask-options {
+  display: flex; flex-wrap: wrap; gap: 9px; justify-content: center;
+  width: 100%; margin-top: 4px;
+}
+/* 선택지 — 가로로 넓은 버튼(2지·3지)과 칩(다지) 겸용 */
+.ask-opt {
+  padding: 13px 20px; border-radius: 999px;
+  font-size: 15px; font-weight: var(--ogq-font-weight-bold);
+  background: var(--ogq-color-mono-050); color: var(--ogq-color-mono-800);
+  border: 1.5px solid var(--ogq-color-mono-100);
+  transition: transform var(--ogq-duration-fast) var(--ogq-easing-default),
+              background var(--ogq-duration-fast) var(--ogq-easing-default);
+}
+.ask-opt:active { transform: scale(.96); }
+.ask-opt.on {
+  background: var(--ogq-color-primary-050, #e6f9f2);
+  color: var(--ogq-color-primary-700, #00805c);
+  border-color: var(--ogq-color-primary-400, #23c99a);
+}
+.ask-opt.wide { flex: 1 1 100%; text-align: center; }
+/* MBTI 4축 토글 */
+.ask-mbti { display: flex; flex-direction: column; gap: 9px; width: 100%; }
+.ask-mbti-row { display: flex; gap: 8px; }
+.ask-mbti-row .ask-opt { flex: 1; text-align: center; padding: 12px 0; }
+.ask-note {
+  width: 100%; padding: 13px 14px; border-radius: var(--ogq-radius-lg);
+  border: 1.5px solid var(--ogq-color-mono-100); background: var(--ogq-color-mono-050);
+  font-family: inherit; font-size: 14.5px; color: var(--ogq-color-mono-900);
+}
+.ask-nav { display: flex; gap: 10px; align-items: center; margin-top: 14px; }
+.ask-back {
+  padding: 13px 18px; border-radius: var(--ogq-radius-lg);
+  background: transparent; color: var(--ogq-color-mono-500);
+  border: 1.5px solid var(--ogq-color-mono-100); font-weight: var(--ogq-font-weight-bold);
+  font-size: 14px;
+}
+.ask-next { flex: 1; }
+.ask-skip {
+  background: none; border: none; color: var(--ogq-color-mono-400);
+  font-size: 13.5px; font-weight: var(--ogq-font-weight-semibold);
+  text-decoration: underline; text-underline-offset: 3px; padding: 10px;
+}
+
 /* ============ 칩·셀렉트·스위치 (여행 설정 폼) ============ */
 .chips { display: flex; flex-wrap: wrap; gap: 8px; }
 .chip {

@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -57,6 +58,15 @@ fun HomeScreen(state: AppState) {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {
+            Icon(
+                painter = painterResource(R.drawable.ic_travit_symbol),
+                contentDescription = null,
+                tint = BrandMint,
+                modifier = Modifier
+                    .width(132.dp)
+                    .height(82.dp),
+            )
+            Spacer(Modifier.height(16.dp))
             Text(
                 "트레빗",
                 style = MaterialTheme.typography.displaySmall,

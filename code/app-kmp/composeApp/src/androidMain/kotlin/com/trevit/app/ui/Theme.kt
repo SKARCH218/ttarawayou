@@ -77,6 +77,9 @@ val TossFaceFontFamily = FontFamily(Font(R.font.tossface))
 // 본문은 시스템 폰트(한글 최적화)를 그대로 쓴다
 private val AppTypography: Typography = Typography()
 
+/** 트레빗 브랜드 민트 — design-system/brand 로고와 동일한 값 */
+val BrandMint = Color(0xFF03B083)
+
 // Journey 지도/컨페티에서 쓰는 브랜드 단축 색
 val MysteryPurple = OGQColors.secondary600
 val MysteryPurpleLight = OGQColors.secondary300

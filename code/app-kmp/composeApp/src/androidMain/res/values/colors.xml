@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 런처 아이콘 배경: 아주 연한 민트 (브랜드 #03B083 계열) -->
+    <color name="ic_launcher_background">#E9F8F3</color>
+</resources>

@@ -14,12 +14,37 @@ import kotlinx.coroutines.withContext
 
 /** 화면 라우팅 */
 sealed interface Screen {
+    data object Intro : Screen        // 브랜드 인트로(스플래시)
     data object Home : Screen
-    data object Setup : Screen        // 여행 설정: 지역/목적/예산/기간/인원
-    data object Profile : Screen      // 프로필: 성별/연령/MBTI/음식/키워드
+    data object Setup : Screen        // 여행 설정: 지역/예산/기간/인원
+    data object Profile : Screen      // 프로필: 한 질문씩 넘기는 설문
     data object Generating : Screen   // 생성 중
     data object Result : Screen       // 결과 플랜
     data class Journey(val dayIndex: Int) : Screen
+}
+
+/**
+ * 프로필 설문 질문 정의. 화면에는 한 번에 하나씩만 보여준다.
+ * [autoAdvance]가 true면 값을 고르는 순간 다음 질문으로 넘어간다(단일 선택 질문).
+ */
+enum class ProfileQuestion(
+    val emoji: String,
+    val title: String,
+    val autoAdvance: Boolean,
+) {
+    Purpose("🧭", "어떤 여행을 원하세요?", true),
+    Gender("👤", "성별을 알려주세요", true),
+    AgeGroup("🎂", "연령대는요?", true),
+    Mbti("🧩", "MBTI가 궁금해요", false),
+    Food("🍚", "어떤 음식을 좋아하세요?", true),
+    Places("🏞️", "어떤 장소가 좋으세요?", false),
+    Walking("🚶", "많이 걷는 건 괜찮으세요?", true),
+    Note("💬", "더 알려주실 취향이 있나요?", false),
+    ;
+
+    companion object {
+        val ordered: List<ProfileQuestion> = entries.toList()
+    }
 }
 
 val REGIONS = listOf(
@@ -32,6 +57,8 @@ val AGE_GROUPS = listOf("10대", "20대", "30대", "40대", "50대+")
 val FOOD_PREFS = listOf("한식", "양식", "일식", "중식", "상관없음")
 val KEYWORD_OPTIONS = listOf("산", "바다", "공원", "강")
 val DURATIONS = listOf("당일", "1박 2일", "2박 3일")
+val GENDER_OPTIONS = listOf("남", "여", "선택 안 함")
+val WALKING_OPTIONS = listOf("괜찮아요", "적게 걷고 싶어요")
 
 /** 앱 전역 상태 홀더 (단일 Activity + Compose 상태 기반 내비게이션) */
 class AppState(
@@ -40,7 +67,7 @@ class AppState(
 ) {
     var baseUrl by mutableStateOf(initialBaseUrl)
         private set
-    var screen by mutableStateOf<Screen>(Screen.Home)
+    var screen by mutableStateOf<Screen>(Screen.Intro)
     var plan by mutableStateOf<PlanResponse?>(null)
         private set
     var errorMessage by mutableStateOf<String?>(null)
@@ -55,6 +82,16 @@ class AppState(
 
     // ---- 프로필 ----
     var gender by mutableStateOf<String?>(null)       // "남" | "여" | null(선택 안 함)
+
+    /**
+     * "선택 안 함"을 명시적으로 고른 상태. [gender]는 두 경우 모두 null을 보내지만
+     * 설문 UI에서 "아직 안 고름"과 구분해 칩을 표시하려면 별도 플래그가 필요하다.
+     */
+    var genderNotSpecified by mutableStateOf(false)
+
+    /** [avoidWalking]은 Boolean이라 "아직 안 고름"을 표현할 수 없어 별도 플래그를 둔다. */
+    var walkingAnswered by mutableStateOf(false)
+
     var ageGroup by mutableStateOf<String?>(null)
     var mbtiEI by mutableStateOf<Char?>(null)
     var mbtiSN by mutableStateOf<Char?>(null)
@@ -64,6 +101,34 @@ class AppState(
     var avoidWalking by mutableStateOf(false)
     val keywords = mutableStateListOf<String>()
     var preferenceNote by mutableStateOf("")
+
+    // ---- 프로필 설문 진행 상태 ----
+    /** 현재 보여주는 질문 인덱스 (0 ~ ProfileQuestion.ordered.lastIndex) */
+    var questionIndex by mutableIntStateOf(0)
+        private set
+
+    val question: ProfileQuestion get() = ProfileQuestion.ordered[questionIndex]
+    val questionCount: Int get() = ProfileQuestion.ordered.size
+
+    /** 프로필 설문 시작 — 항상 첫 질문부터 */
+    fun startProfile() {
+        questionIndex = 0
+        screen = Screen.Profile
+    }
+
+    /** 다음 질문으로. 마지막 질문이면 플랜 생성으로 넘어간다. */
+    fun nextQuestion() {
+        if (questionIndex < ProfileQuestion.ordered.lastIndex) {
+            questionIndex++
+        } else {
+            screen = Screen.Generating
+        }
+    }
+
+    /** 이전 질문으로. 첫 질문에서는 여행 설정 화면으로 돌아간다. */
+    fun previousQuestion() {
+        if (questionIndex > 0) questionIndex-- else screen = Screen.Setup
+    }
 
     private val repository = PlanRepository()
 

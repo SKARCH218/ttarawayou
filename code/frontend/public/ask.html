@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>트레빗 — 취향 알아보기</title>
+  <link rel="icon" href="brand/travit-symbol.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="css/ogq-tokens.css?v=29" />
+  <link rel="stylesheet" href="css/style.css?v=29" />
+</head>
+<body>
+  <div class="phone">
+    <div class="app">
+      <div class="ask-screen">
+        <div class="ask-progress" id="progress"></div>
+        <p class="ask-count" id="count"></p>
+
+        <!-- 이모지가 가운데, 질문과 선택지는 그 아래 -->
+        <div class="ask-body" id="body"></div>
+
+        <div class="ask-nav">
+          <button class="ask-back" id="backBtn">이전</button>
+          <button class="btn-primary ask-next" id="nextBtn" style="margin:0;">다음</button>
+        </div>
+        <button class="ask-skip" id="skipBtn">건너뛰기</button>
+
+        <div class="error-box" id="errorBox"></div>
+      </div>
+
+      <div class="loading-overlay" id="loading">
+        <div class="spinner"></div>
+        <p><b>AI가 계획을 세우는 중</b><br />
+        <span id="loadingMsg">예산을 배분하고 있어요</span></p>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/common.js?v=29"></script>
+  <script src="js/ask.js?v=29"></script>
+</body>
+</html>

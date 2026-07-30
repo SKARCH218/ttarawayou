@@ -40,7 +40,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.trevit.app.AppState
 import com.trevit.app.DURATIONS
-import com.trevit.app.PURPOSES
 import com.trevit.app.R
 import com.trevit.app.REGIONS
 import com.trevit.app.Screen
@@ -65,8 +64,9 @@ fun SetupScreen(state: AppState) {
         },
         bottomBar = {
             Button(
-                onClick = { state.screen = Screen.Profile },
-                enabled = state.region != null && state.purpose != null,
+                // 목적을 포함한 취향 질문은 프로필 설문(한 질문씩)에서 물어본다
+                onClick = { state.startProfile() },
+                enabled = state.region != null,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(16.dp)
@@ -108,17 +108,6 @@ fun SetupScreen(state: AppState) {
                             label = { Text(region) },
                         )
                     }
-            }
-
-            SectionLabel("목적")
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                PURPOSES.forEach { purpose ->
-                    FilterChip(
-                        selected = state.purpose == purpose,
-                        onClick = { state.purpose = purpose },
-                        label = { Text(purpose) },
-                    )
-                }
             }
 
             SectionLabel("예산")

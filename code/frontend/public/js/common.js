@@ -21,6 +21,16 @@ function loadPlan() {
   return raw ? JSON.parse(raw) : null;
 }
 
+/** 여행 설정(지역·예산·기간·인원) — index.html → ask.html 로 전달 */
+function saveSetup(setup) {
+  sessionStorage.setItem('trevitSetup', JSON.stringify(setup));
+}
+
+function loadSetup() {
+  const raw = sessionStorage.getItem('trevitSetup');
+  return raw ? JSON.parse(raw) : null;
+}
+
 /** 하버사인 거리(미터) */
 function distanceMeters(lat1, lng1, lat2, lng2) {
   const R = 6371000;
