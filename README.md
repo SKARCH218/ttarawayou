@@ -31,13 +31,17 @@
 
 ## 2. 앱 화면 (Android)
 
-| 홈 | 여행 설정 | 프로필 |
+| 인트로 | 여행 설정 | 취향 질문 |
 |:-:|:-:|:-:|
-| <img src="docs/screenshots/01_home.png" width="200"/> | <img src="docs/screenshots/02_setup.png" width="200"/> | <img src="docs/screenshots/03_profile.png" width="200"/> |
+| <img src="docs/screenshots/07_intro.png" width="200"/> | <img src="docs/screenshots/02_setup.png" width="200"/> | <img src="docs/screenshots/08_question.png" width="200"/> |
 
-| 결과 (AI 추천 이유) | 여정 (경로 안내) | 도착 공개 |
+| MBTI 질문 | 결과 (AI 추천 이유) | 여정 (경로 안내) |
 |:-:|:-:|:-:|
-| <img src="docs/screenshots/04_result.png" width="200"/> | <img src="docs/screenshots/05_journey.png" width="200"/> | <img src="docs/screenshots/06_reveal.png" width="200"/> |
+| <img src="docs/screenshots/09_question_mbti.png" width="200"/> | <img src="docs/screenshots/04_result.png" width="200"/> | <img src="docs/screenshots/05_journey.png" width="200"/> |
+
+| 도착 공개 | 취향 메모 | 런처 아이콘 |
+|:-:|:-:|:-:|
+| <img src="docs/screenshots/06_reveal.png" width="200"/> | <img src="docs/screenshots/10_question_note.png" width="200"/> | <img src="docs/screenshots/12_launcher_icon.png" width="200"/> |
 
 ## 3. 핵심 사용자 경험
 

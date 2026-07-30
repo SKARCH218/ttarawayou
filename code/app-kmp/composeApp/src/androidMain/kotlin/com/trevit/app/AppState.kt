@@ -33,11 +33,11 @@ enum class ProfileQuestion(
     val autoAdvance: Boolean,
 ) {
     Purpose("🧭", "어떤 여행을 원하세요?", true),
-    Gender("👤", "성별을 알려주세요", true),
-    AgeGroup("🎂", "연령대는요?", true),
-    Mbti("🧩", "MBTI가 궁금해요", false),
+    Gender("🙂", "성별을 알려주세요", true),
+    AgeGroup("🎂", "연령대는 어떻게 되세요?", true),
+    Mbti("🧩", "MBTI를 알려주세요", false),
     Food("🍚", "어떤 음식을 좋아하세요?", true),
-    Places("🏞️", "어떤 장소가 좋으세요?", false),
+    Places("🏞️", "어떤 곳에 가고 싶으세요?", false),
     Walking("🚶", "많이 걷는 건 괜찮으세요?", true),
     Note("💬", "더 알려주실 취향이 있나요?", false),
     ;
