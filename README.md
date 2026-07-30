@@ -102,7 +102,7 @@
 ### 백엔드 + 웹 데모 (단일 jar)
 
 ```bash
-cd code/backend-kotlin
+cd code/backend
 ./gradlew bootRun          # http://localhost:8080
 ```
 
@@ -120,7 +120,7 @@ cd code/app-kmp
 
 ```bash
 cd code
-docker build -f backend-kotlin/Dockerfile -t trevit . && docker run -p 8080:8080 trevit
+docker build -f backend/Dockerfile -t trevit . && docker run -p 8080:8080 trevit
 ```
 
 ## 7. AI 사용 내역 (전면 공개)

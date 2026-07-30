@@ -4,7 +4,7 @@ import kotlinx.serialization.Serializable
 
 /**
  * 백엔드 PlanDtos.java 와 1:1 대응하는 직렬화 모델.
- * (backend-kotlin/src/main/kotlin/com/ttarawayou/dto/PlanDtos.kt)
+ * (backend/src/main/kotlin/com/trevit/dto/PlanDtos.kt)
  */
 
 /** POST /api/plan 요청 본문 (v2 — 프로필/취향 필드는 전부 선택) */
