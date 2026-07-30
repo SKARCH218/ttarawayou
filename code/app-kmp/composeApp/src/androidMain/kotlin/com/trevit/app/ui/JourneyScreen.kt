@@ -479,7 +479,11 @@ private fun RevealOverlay(stop: StopDto, isLast: Boolean, onContinue: () -> Unit
                         fontWeight = FontWeight.Bold,
                     )
                     Spacer(Modifier.height(12.dp))
-                    Text(stopEmoji(stop.type), fontSize = 54.sp)
+                    Text(
+                        stopEmoji(stop.type),
+                        fontSize = 54.sp,
+                        fontFamily = TossFaceFontFamily, // 이모지만 토스페이스로
+                    )
                     Spacer(Modifier.height(8.dp))
                     Text(
                         stop.name ?: "미스터리 장소",

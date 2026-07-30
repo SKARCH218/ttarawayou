@@ -27,7 +27,17 @@
 사용자는 예산과 취향만 알려줍니다. 일정·식당·숙소·동선은 딥러닝이 결정하고,
 **개별 장소는 도착하는 순간까지 비공개**입니다. (지역은 사용자가 선택 — 수도권 21곳)
 
-## 2. 핵심 사용자 경험
+## 2. 앱 화면 (Android)
+
+| 홈 | 여행 설정 | 프로필 |
+|:-:|:-:|:-:|
+| <img src="docs/screenshots/01_home.png" width="200"/> | <img src="docs/screenshots/02_setup.png" width="200"/> | <img src="docs/screenshots/03_profile.png" width="200"/> |
+
+| 결과 (AI 추천 이유) | 여정 (경로 안내) | 도착 공개 |
+|:-:|:-:|:-:|
+| <img src="docs/screenshots/04_result.png" width="200"/> | <img src="docs/screenshots/05_journey.png" width="200"/> | <img src="docs/screenshots/06_reveal.png" width="200"/> |
+
+## 3. 핵심 사용자 경험
 
 ```
 프로필 입력(성별·연령·MBTI·목적·음식·취향 메모) + 지역·예산·기간
@@ -43,7 +53,7 @@
 - **대중교통 통합**: 승하차 정류장 안내, 실시간 버스 도착정보, 하차 카운트다운
 - **데모 모드**: GPS 없이 경로 자동 이동(배속 조절) — 심사·시연용
 
-## 3. 아키텍처
+## 4. 아키텍처
 
 ```
 ┌ 클라이언트 ────────────────────────────────────────────┐
@@ -67,7 +77,7 @@
 **폴백 설계 원칙**: 외부 API 키가 하나도 없어도 전체 플로우가 동작합니다.
 (TMAP → 수도권 시드 / LLM → 휴리스틱 / 대중교통 → 도보·직선 경로)
 
-## 4. 사용 스택
+## 5. 사용 스택
 
 | 구분 | 기술 |
 |---|---|
@@ -79,7 +89,7 @@
 | 외부 API | SK open API(TMAP) · 국토부 TAGO · ODsay · OSRM |
 | 배포 | Docker 멀티스테이지 · Render |
 
-## 5. 실행 방법
+## 6. 실행 방법
 
 ### 백엔드 + 웹 데모 (단일 jar)
 
@@ -105,7 +115,7 @@ cd code
 docker build -f backend-kotlin/Dockerfile -t trevit . && docker run -p 8080:8080 trevit
 ```
 
-## 6. AI 사용 내역 (전면 공개)
+## 7. AI 사용 내역 (전면 공개)
 
 ### 프로덕트에 들어간 AI
 - **LLM 여행 계획 수립**: LM Studio(OpenAI 호환)의 `google/gemma-4-26b-a4b-qat` — 사용자 프로필(성별·연령·MBTI·목적·음식·자연어 취향 메모)을 프롬프트로 받아 장소 선택·일정 구성·추천 이유 생성. 타임아웃·실패 시 휴리스틱 자동 폴백
@@ -118,7 +128,7 @@ docker build -f backend-kotlin/Dockerfile -t trevit . && docker run -p 8080:8080
 - Spring Boot, Leaflet, OSRM, Compose Multiplatform, Ktor, 토스페이스(토스) 등
 - 지도교사 김영우 · 충남권 창업아이디어 경진대회 멘토링
 
-## 7. 팀 — Kims & Lee
+## 8. 팀 — Kims & Lee
 
 | 역할 | 이름 | 담당 |
 |---|---|---|
@@ -127,6 +137,6 @@ docker build -f backend-kotlin/Dockerfile -t trevit . && docker run -p 8080:8080
 | 팀원 | 김준서 (3학년) | UI/UX |
 | 팀원 | 이윤호 (1학년) | QA · 테스트 |
 
-## 8. 라이선스
+## 9. 라이선스
 
 [Apache License 2.0](LICENSE)

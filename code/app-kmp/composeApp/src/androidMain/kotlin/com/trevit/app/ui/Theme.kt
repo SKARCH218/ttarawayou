@@ -66,30 +66,16 @@ private val DarkColors = darkColorScheme(
 )
 
 /**
- * 토스페이스 이모지 폰트 — fallback 1순위.
- * 이모지 전용이라 한글/숫자는 시스템 폰트로 자동 폴백된다.
+ * 토스페이스 이모지 폰트.
+ *
+ * 전체 Typography에 적용하면 안 된다 — 이 폰트는 숫자·문자 글리프의 자간이 넓어
+ * "300,000원"이 "3 0 0 , 0 0 0 원"처럼 벌어져 보인다.
+ * 이모지를 그리는 Text에만 `fontFamily = TossFaceFontFamily`로 직접 지정한다.
  */
 val TossFaceFontFamily = FontFamily(Font(R.font.tossface))
 
-private val AppTypography: Typography = Typography().let { base ->
-    Typography(
-        displayLarge = base.displayLarge.copy(fontFamily = TossFaceFontFamily),
-        displayMedium = base.displayMedium.copy(fontFamily = TossFaceFontFamily),
-        displaySmall = base.displaySmall.copy(fontFamily = TossFaceFontFamily),
-        headlineLarge = base.headlineLarge.copy(fontFamily = TossFaceFontFamily),
-        headlineMedium = base.headlineMedium.copy(fontFamily = TossFaceFontFamily),
-        headlineSmall = base.headlineSmall.copy(fontFamily = TossFaceFontFamily),
-        titleLarge = base.titleLarge.copy(fontFamily = TossFaceFontFamily),
-        titleMedium = base.titleMedium.copy(fontFamily = TossFaceFontFamily),
-        titleSmall = base.titleSmall.copy(fontFamily = TossFaceFontFamily),
-        bodyLarge = base.bodyLarge.copy(fontFamily = TossFaceFontFamily),
-        bodyMedium = base.bodyMedium.copy(fontFamily = TossFaceFontFamily),
-        bodySmall = base.bodySmall.copy(fontFamily = TossFaceFontFamily),
-        labelLarge = base.labelLarge.copy(fontFamily = TossFaceFontFamily),
-        labelMedium = base.labelMedium.copy(fontFamily = TossFaceFontFamily),
-        labelSmall = base.labelSmall.copy(fontFamily = TossFaceFontFamily),
-    )
-}
+// 본문은 시스템 폰트(한글 최적화)를 그대로 쓴다
+private val AppTypography: Typography = Typography()
 
 // Journey 지도/컨페티에서 쓰는 브랜드 단축 색
 val MysteryPurple = OGQColors.secondary600
