@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>트레빗 — 여행 만들기</title>
+  <link rel="stylesheet" href="css/ogq-tokens.css?v=23" />
+  <link rel="stylesheet" href="css/style.css?v=23" />
+</head>
+<body>
+  <div class="phone">
+    <div class="app">
+      <div class="screen">
+        <p class="brand">트레빗</p>
+        <h1 class="title">AI가 여행을<br />대신 결정해요</h1>
+        <p class="subtitle">장소는 도착 전까지 비밀</p>
+
+        <div class="card">
+          <div class="field">
+            <label>지역</label>
+            <select id="regionSelect" class="ds-select">
+              <option>서울</option><option>인천</option><option>강화</option><option>수원</option>
+              <option>가평</option><option>양평</option><option>파주</option><option>포천</option>
+              <option>용인</option><option>남양주</option><option>이천</option><option>여주</option>
+              <option>화성</option><option>시흥</option><option>과천</option><option>광주</option>
+              <option>김포</option><option>안산</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label>목적</label>
+            <div class="chips" id="purposeChips" data-single>
+              <button type="button" class="chip on" data-v="휴양">휴양</button>
+              <button type="button" class="chip" data-v="관광">관광</button>
+              <button type="button" class="chip" data-v="미식">미식</button>
+              <button type="button" class="chip" data-v="액티비티">액티비티</button>
+            </div>
+          </div>
+
+          <div class="field">
+            <label>예산</label>
+            <div class="budget-display">
+              <span class="budget-num" id="budgetValue" title="눌러서 직접 입력">300,000</span>
+              <span class="unit-inline">토큰</span>
+            </div>
+            <input type="range" class="budget-slider" id="budgetSlider"
+                   min="50000" max="500000" step="10000" value="300000" />
+            <div class="wallet-row">
+              <span>보유 <b id="walletBalance">…</b></span>
+              <button type="button" class="charge-btn" id="chargeBtn">충전</button>
+            </div>
+          </div>
+
+          <div class="field-row">
+            <div class="field">
+              <label>기간</label>
+              <div class="stepper">
+                <button type="button" data-step="days" data-delta="-1"><img class="ds-icon" src="icons/Remove_Minus.png" alt="−" /></button>
+                <div class="stepper-value"><span id="daysValue">2</span><small>일</small></div>
+                <button type="button" data-step="days" data-delta="1"><img class="ds-icon" src="icons/Add_Plus.png" alt="＋" /></button>
+              </div>
+            </div>
+            <div class="field">
+              <label>인원</label>
+              <div class="stepper">
+                <button type="button" data-step="people" data-delta="-1"><img class="ds-icon" src="icons/Remove_Minus.png" alt="−" /></button>
+                <div class="stepper-value"><span id="peopleValue">1</span><small>명</small></div>
+                <button type="button" data-step="people" data-delta="1"><img class="ds-icon" src="icons/Add_Plus.png" alt="＋" /></button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="field">
+            <label>음식</label>
+            <div class="chips" id="foodChips" data-single>
+              <button type="button" class="chip on" data-v="상관없음">상관없음</button>
+              <button type="button" class="chip" data-v="한식">한식</button>
+              <button type="button" class="chip" data-v="양식">양식</button>
+              <button type="button" class="chip" data-v="일식">일식</button>
+              <button type="button" class="chip" data-v="중식">중식</button>
+            </div>
+          </div>
+
+          <div class="field">
+            <label>좋아하는 곳</label>
+            <div class="chips" id="keywordChips">
+              <button type="button" class="chip" data-v="산">산</button>
+              <button type="button" class="chip" data-v="바다">바다</button>
+              <button type="button" class="chip" data-v="공원">공원</button>
+              <button type="button" class="chip" data-v="강">강</button>
+            </div>
+          </div>
+
+          <div class="field">
+            <label>취향 메모 <small style="color:var(--ogq-color-mono-500);">(선택)</small></label>
+            <input type="text" id="prefNote" class="ds-select" maxlength="120"
+                   placeholder="예: 매운 음식 좋아요, 조용한 카페 위주로" />
+          </div>
+
+          <div class="field switch-row">
+            <label for="avoidWalking">걷기 최소화</label>
+            <label class="switch"><input type="checkbox" id="avoidWalking" /><span class="knob"></span></label>
+          </div>
+
+          <div class="field-row">
+            <div class="field">
+              <label>성별</label>
+              <select id="genderSelect" class="ds-select">
+                <option value="">선택 안함</option>
+                <option value="MALE">남성</option>
+                <option value="FEMALE">여성</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>연령대</label>
+              <select id="ageSelect" class="ds-select">
+                <option value="">선택 안함</option>
+                <option>10대</option><option>20대</option><option>30대</option>
+                <option>40대</option><option>50대+</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>MBTI</label>
+              <select id="mbtiSelect" class="ds-select">
+                <option value="">모름</option>
+                <option>INFP</option><option>INFJ</option><option>INTP</option><option>INTJ</option>
+                <option>ISFP</option><option>ISFJ</option><option>ISTP</option><option>ISTJ</option>
+                <option>ENFP</option><option>ENFJ</option><option>ENTP</option><option>ENTJ</option>
+                <option>ESFP</option><option>ESFJ</option><option>ESTP</option><option>ESTJ</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="error-box" id="errorBox"></div>
+
+        <div style="margin-top:16px;">
+          <button class="btn-primary" id="createBtn">AI에게 맡기기</button>
+        </div>
+      </div>
+
+      <div class="loading-overlay" id="loading">
+        <div class="spinner"></div>
+        <p><b>AI가 계획을 세우는 중</b><br />
+        <span id="loadingMsg">예산을 배분하고 있어요</span></p>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/common.js?v=23"></script>
+  <script src="js/budget.js?v=23"></script>
+</body>
+</html>

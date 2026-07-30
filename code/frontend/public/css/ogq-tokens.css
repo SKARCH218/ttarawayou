@@ -1,0 +1,386 @@
+/* OGQ Design System — Auto-generated */
+/* Do not edit manually. Modify tokens/*.json and rebuild. */
+
+:root {
+  /* Gray 100 */
+  --ogq-color-mono-100: #d8dfdf;
+  /* Gray 200 */
+  --ogq-color-mono-200: #a7b6b9;
+  /* Gray 300 */
+  --ogq-color-mono-300: #92a5a8;
+  /* Gray 400 */
+  --ogq-color-mono-400: #899c9f;
+  /* Gray 500 */
+  --ogq-color-mono-500: #7c9295;
+  /* Gray 600 */
+  --ogq-color-mono-600: #6c7e84;
+  /* Gray 700 */
+  --ogq-color-mono-700: #57676b;
+  /* Gray 800 */
+  --ogq-color-mono-800: #465357;
+  /* Gray 900 */
+  --ogq-color-mono-900: #333e40;
+  /* Near black */
+  --ogq-color-mono-990: #262d2e;
+  /* White */
+  --ogq-color-mono-000: #ffffff;
+  /* Near white */
+  --ogq-color-mono-010: #fcfdfd;
+  /* Lightest gray */
+  --ogq-color-mono-030: #f9fbfb;
+  /* Very light gray */
+  --ogq-color-mono-050: #f3f6f6;
+  /* Light gray */
+  --ogq-color-mono-080: #edf1f1;
+  /* Teal 100 */
+  --ogq-color-primary-100: #b5e5d7;
+  /* Teal 200 */
+  --ogq-color-primary-200: #9bdfcc;
+  /* Teal 300 */
+  --ogq-color-primary-300: #6ed2b4;
+  /* Teal 400 */
+  --ogq-color-primary-400: #28c799;
+  /* Teal 500 — Brand */
+  --ogq-color-primary-500: #00c389;
+  /* Teal 600 */
+  --ogq-color-primary-600: #00c389;
+  /* Teal 700 */
+  --ogq-color-primary-700: #00b57f;
+  /* Teal 800 */
+  --ogq-color-primary-800: #009969;
+  /* Teal 900 */
+  --ogq-color-primary-900: #007d56;
+  /* Teal 990 */
+  --ogq-color-primary-990: #006147;
+  /* Teal 10 */
+  --ogq-color-primary-010: #fbfdfc;
+  /* Teal 30 */
+  --ogq-color-primary-030: #eefbf6;
+  /* Teal 50 */
+  --ogq-color-primary-050: #daf5ec;
+  /* Teal 80 */
+  --ogq-color-primary-080: #c8efe2;
+  /* Purple 100 */
+  --ogq-color-secondary-100: #d2c8f9;
+  /* Purple 200 */
+  --ogq-color-secondary-200: #bfb0f2;
+  /* Purple 300 */
+  --ogq-color-secondary-300: #a78fec;
+  /* Purple 400 */
+  --ogq-color-secondary-400: #8b67e6;
+  /* Purple 500 */
+  --ogq-color-secondary-500: #703fe4;
+  /* Purple 600 */
+  --ogq-color-secondary-600: #703fe4;
+  /* Purple 700 */
+  --ogq-color-secondary-700: #5b1dcd;
+  /* Purple 800 */
+  --ogq-color-secondary-800: #4711ab;
+  /* Purple 900 */
+  --ogq-color-secondary-900: #370e84;
+  /* Purple 990 */
+  --ogq-color-secondary-990: #290d5e;
+  /* Purple 10 */
+  --ogq-color-secondary-010: #fbfbfe;
+  /* Purple 30 */
+  --ogq-color-secondary-030: #f1ecfc;
+  /* Purple 50 */
+  --ogq-color-secondary-050: #e5dcfa;
+  /* Purple 80 */
+  --ogq-color-secondary-080: #d9cdf7;
+  --ogq-color-accent-blue-100: #bfe0fd;
+  --ogq-color-accent-blue-200: #75c2fa;
+  --ogq-color-accent-blue-300: #1384d7;
+  --ogq-color-accent-blue-400: #3b7cf3;
+  --ogq-color-accent-blue-500: #1490eb;
+  --ogq-color-accent-blue-030: #f0f8ff;
+  --ogq-color-accent-blue-050: #e6f4ff;
+  --ogq-color-accent-red-100: #ffd0d3;
+  --ogq-color-accent-red-200: #ff8a93;
+  --ogq-color-accent-red-300: #e21235;
+  --ogq-color-accent-red-400: #c90e2e;
+  --ogq-color-accent-red-030: #ffeeef;
+  --ogq-color-accent-red-050: #ffe2e4;
+  --ogq-color-accent-green: #00ff85;
+  --ogq-color-accent-orange: #ff550d;
+  --ogq-color-accent-purple: #7f00ff;
+  --ogq-color-semantic-success-light: #daf5ec;
+  --ogq-color-semantic-success-default: #00c389;
+  --ogq-color-semantic-success-dark: #007d56;
+  --ogq-color-semantic-warning-light: #fff3e0;
+  --ogq-color-semantic-warning-default: #ff9800;
+  --ogq-color-semantic-warning-dark: #e65100;
+  --ogq-color-semantic-error-light: #ffe2e4;
+  --ogq-color-semantic-error-default: #e21235;
+  --ogq-color-semantic-error-dark: #c90e2e;
+  --ogq-color-semantic-info-light: #e6f4ff;
+  --ogq-color-semantic-info-default: #1384d7;
+  --ogq-color-semantic-info-dark: #0d5fa3;
+  --ogq-color-social-naver: #03c75a;
+  --ogq-color-social-facebook: #3d5a98;
+  --ogq-color-social-afreeca: #0545b1;
+  --ogq-color-social-google: #4285f4;
+  --ogq-color-social-apple: #000000;
+  --ogq-color-social-kakao: #fee500;
+  --ogq-color-dark-background-primary: #1a1a1a;
+  --ogq-color-dark-background-secondary: #2a2a2a;
+  --ogq-color-dark-background-tertiary: #3a3a3a;
+  --ogq-color-dark-background-elevated: #2f2f2f;
+  --ogq-color-dark-text-primary: #ffffff;
+  --ogq-color-dark-text-secondary: #a0a0a0;
+  --ogq-color-dark-text-tertiary: #6a6a6a;
+  --ogq-color-dark-text-disabled: #4a4a4a;
+  --ogq-color-dark-border-default: #3a3a3a;
+  --ogq-color-dark-border-subtle: #2a2a2a;
+  --ogq-spacing-0: 0px;
+  --ogq-spacing-1: 2px;
+  --ogq-spacing-2: 4px;
+  --ogq-spacing-3: 6px;
+  --ogq-spacing-4: 8px;
+  --ogq-spacing-5: 10px;
+  --ogq-spacing-6: 12px;
+  --ogq-spacing-8: 16px;
+  --ogq-spacing-10: 20px;
+  --ogq-spacing-12: 24px;
+  --ogq-spacing-14: 28px;
+  --ogq-spacing-16: 32px;
+  --ogq-spacing-20: 40px;
+  --ogq-spacing-24: 48px;
+  --ogq-spacing-32: 64px;
+  --ogq-spacing-40: 80px;
+  --ogq-spacing-60: 120px;
+  --ogq-radius-none: 0px;
+  --ogq-radius-sm: 4px;
+  --ogq-radius-md: 8px;
+  --ogq-radius-lg: 12px;
+  --ogq-radius-xl: 16px;
+  --ogq-radius-2xl: 20px;
+  --ogq-radius-full: 1000px;
+  /* Subtle shadow for small elements */
+  --ogq-shadow-xs: 0px 1px 2px 0px rgba(0, 0, 0, 0.05);
+  /* Light shadow for cards */
+  --ogq-shadow-sm: 0px 1px 3px 0px rgba(0, 0, 0, 0.1), 0px 1px 2px -1px rgba(0, 0, 0, 0.1);
+  /* Medium shadow for floating elements */
+  --ogq-shadow-md: 0px 4px 6px -1px rgba(0, 0, 0, 0.1), 0px 2px 4px -2px rgba(0, 0, 0, 0.1);
+  /* Large shadow for modals */
+  --ogq-shadow-lg: 0px 10px 15px -3px rgba(0, 0, 0, 0.1), 0px 4px 6px -4px rgba(0, 0, 0, 0.1);
+  /* Extra large shadow for popovers */
+  --ogq-shadow-xl: 0px 20px 25px -5px rgba(0, 0, 0, 0.1), 0px 8px 10px -6px rgba(0, 0, 0, 0.1);
+  /* OGQ card shadow (legacy) */
+  --ogq-shadow-card: 0px 4px 15px 0px rgba(222, 222, 222, 0.3);
+  /* Flat — no elevation */
+  --ogq-elevation-0: none;
+  /* Slight rise — buttons, inputs */
+  --ogq-elevation-1: 0px 1px 2px 0px rgba(0, 0, 0, 0.05);
+  /* Cards, dropdown */
+  --ogq-elevation-2: 0px 4px 6px -1px rgba(0, 0, 0, 0.1), 0px 2px 4px -2px rgba(0, 0, 0, 0.1);
+  /* Modals, popovers */
+  --ogq-elevation-3: 0px 10px 15px -3px rgba(0, 0, 0, 0.1), 0px 4px 6px -4px rgba(0, 0, 0, 0.1);
+  /* Toast, navigation overlay */
+  --ogq-elevation-4: 0px 20px 25px -5px rgba(0, 0, 0, 0.1), 0px 8px 10px -6px rgba(0, 0, 0, 0.1);
+  /* Highest — dialogs, sheets */
+  --ogq-elevation-5: 0px 25px 50px -12px rgba(0, 0, 0, 0.25);
+  /* Micro-interactions (toggle, check) */
+  --ogq-duration-instant: 50ms;
+  /* Button press, hover */
+  --ogq-duration-fast: 100ms;
+  /* Dropdown, tooltip */
+  --ogq-duration-normal: 200ms;
+  /* Modal open, tab switch */
+  --ogq-duration-moderate: 300ms;
+  /* Page transition, accordion */
+  --ogq-duration-slow: 400ms;
+  /* Complex animations */
+  --ogq-duration-slower: 500ms;
+  /* Full-screen transitions */
+  --ogq-duration-slowest: 700ms;
+  /* Standard — most interactions */
+  --ogq-easing-default: cubic-bezier(0.2, 0, 0, 1);
+  /* Decelerate — entry */
+  --ogq-easing-emphasize: cubic-bezier(0.2, 0, 0, 1);
+  /* Content entering view */
+  --ogq-easing-decelerate: cubic-bezier(0, 0, 0, 1);
+  /* Content leaving view */
+  --ogq-easing-accelerate: cubic-bezier(0.3, 0, 1, 1);
+  /* Progress bars, loaders */
+  --ogq-easing-linear: linear;
+  /* Playful bounce */
+  --ogq-easing-spring: cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  --ogq-z-hide: -1;
+  --ogq-z-base: 0;
+  --ogq-z-raised: 1;
+  --ogq-z-dropdown: 1000;
+  --ogq-z-sticky: 1100;
+  --ogq-z-overlay: 1200;
+  --ogq-z-modal: 1300;
+  --ogq-z-popover: 1400;
+  --ogq-z-toast: 1500;
+  --ogq-z-tooltip: 1600;
+  --ogq-opacity-0: 0;
+  --ogq-opacity-5: 0.05;
+  --ogq-opacity-10: 0.1;
+  --ogq-opacity-20: 0.2;
+  --ogq-opacity-30: 0.3;
+  --ogq-opacity-40: 0.4;
+  --ogq-opacity-50: 0.5;
+  --ogq-opacity-60: 0.6;
+  --ogq-opacity-70: 0.7;
+  --ogq-opacity-80: 0.8;
+  --ogq-opacity-90: 0.9;
+  --ogq-opacity-100: 1;
+  --ogq-font-sans: 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, system-ui, Roboto, 'Helvetica Neue', 'Segoe UI', 'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', sans-serif;
+  --ogq-font-mono: 'SF Mono', 'Fira Code', 'Fira Mono', 'Roboto Mono', monospace;
+  --ogq-font-weight-light: 300;
+  --ogq-font-weight-regular: 400;
+  --ogq-font-weight-medium: 500;
+  --ogq-font-weight-semibold: 600;
+  --ogq-font-weight-bold: 700;
+
+  /* Typography Scale */
+  --ogq-text-display-xl-size: 3.5rem;
+  --ogq-text-display-xl-line: 1.1;
+  --ogq-text-display-xl-tracking: -0.025em;
+  --ogq-text-display-xl-weight: 700;
+  --ogq-text-display-lg-size: 3rem;
+  --ogq-text-display-lg-line: 1.15;
+  --ogq-text-display-lg-tracking: -0.02em;
+  --ogq-text-display-lg-weight: 700;
+  --ogq-text-display-md-size: 2.25rem;
+  --ogq-text-display-md-line: 1.2;
+  --ogq-text-display-md-tracking: -0.015em;
+  --ogq-text-display-md-weight: 600;
+  --ogq-text-heading-xl-size: 1.875rem;
+  --ogq-text-heading-xl-line: 1.25;
+  --ogq-text-heading-xl-tracking: -0.01em;
+  --ogq-text-heading-xl-weight: 600;
+  --ogq-text-heading-lg-size: 1.5rem;
+  --ogq-text-heading-lg-line: 1.3;
+  --ogq-text-heading-lg-tracking: -0.005em;
+  --ogq-text-heading-lg-weight: 600;
+  --ogq-text-heading-md-size: 1.25rem;
+  --ogq-text-heading-md-line: 1.4;
+  --ogq-text-heading-md-tracking: 0;
+  --ogq-text-heading-md-weight: 600;
+  --ogq-text-heading-sm-size: 1.125rem;
+  --ogq-text-heading-sm-line: 1.4;
+  --ogq-text-heading-sm-tracking: 0;
+  --ogq-text-heading-sm-weight: 500;
+  --ogq-text-body-lg-size: 1.125rem;
+  --ogq-text-body-lg-line: 1.6;
+  --ogq-text-body-lg-tracking: 0;
+  --ogq-text-body-lg-weight: 400;
+  --ogq-text-body-md-size: 1rem;
+  --ogq-text-body-md-line: 1.6;
+  --ogq-text-body-md-tracking: 0;
+  --ogq-text-body-md-weight: 400;
+  --ogq-text-body-sm-size: 0.875rem;
+  --ogq-text-body-sm-line: 1.5;
+  --ogq-text-body-sm-tracking: 0.005em;
+  --ogq-text-body-sm-weight: 400;
+  --ogq-text-caption-size: 0.75rem;
+  --ogq-text-caption-line: 1.5;
+  --ogq-text-caption-tracking: 0.01em;
+  --ogq-text-caption-weight: 400;
+  --ogq-text-overline-size: 0.6875rem;
+  --ogq-text-overline-line: 1.5;
+  --ogq-text-overline-tracking: 0.08em;
+  --ogq-text-overline-weight: 600;
+
+  /* Breakpoints (reference only — use @media) */
+  --ogq-bp-xs: 360px;
+  --ogq-bp-sm: 768px;
+  --ogq-bp-md: 1080px;
+  --ogq-bp-lg: 1280px;
+  --ogq-bp-xl: 1440px;
+  --ogq-bp-2xl: 1920px;
+}
+
+/* Typography Utility Classes */
+.ogq-text-display-xl {
+  font-size: var(--ogq-text-display-xl-size);
+  line-height: var(--ogq-text-display-xl-line);
+  letter-spacing: var(--ogq-text-display-xl-tracking);
+  font-weight: var(--ogq-text-display-xl-weight);
+}
+.ogq-text-display-lg {
+  font-size: var(--ogq-text-display-lg-size);
+  line-height: var(--ogq-text-display-lg-line);
+  letter-spacing: var(--ogq-text-display-lg-tracking);
+  font-weight: var(--ogq-text-display-lg-weight);
+}
+.ogq-text-display-md {
+  font-size: var(--ogq-text-display-md-size);
+  line-height: var(--ogq-text-display-md-line);
+  letter-spacing: var(--ogq-text-display-md-tracking);
+  font-weight: var(--ogq-text-display-md-weight);
+}
+.ogq-text-heading-xl {
+  font-size: var(--ogq-text-heading-xl-size);
+  line-height: var(--ogq-text-heading-xl-line);
+  letter-spacing: var(--ogq-text-heading-xl-tracking);
+  font-weight: var(--ogq-text-heading-xl-weight);
+}
+.ogq-text-heading-lg {
+  font-size: var(--ogq-text-heading-lg-size);
+  line-height: var(--ogq-text-heading-lg-line);
+  letter-spacing: var(--ogq-text-heading-lg-tracking);
+  font-weight: var(--ogq-text-heading-lg-weight);
+}
+.ogq-text-heading-md {
+  font-size: var(--ogq-text-heading-md-size);
+  line-height: var(--ogq-text-heading-md-line);
+  letter-spacing: var(--ogq-text-heading-md-tracking);
+  font-weight: var(--ogq-text-heading-md-weight);
+}
+.ogq-text-heading-sm {
+  font-size: var(--ogq-text-heading-sm-size);
+  line-height: var(--ogq-text-heading-sm-line);
+  letter-spacing: var(--ogq-text-heading-sm-tracking);
+  font-weight: var(--ogq-text-heading-sm-weight);
+}
+.ogq-text-body-lg {
+  font-size: var(--ogq-text-body-lg-size);
+  line-height: var(--ogq-text-body-lg-line);
+  letter-spacing: var(--ogq-text-body-lg-tracking);
+  font-weight: var(--ogq-text-body-lg-weight);
+}
+.ogq-text-body-md {
+  font-size: var(--ogq-text-body-md-size);
+  line-height: var(--ogq-text-body-md-line);
+  letter-spacing: var(--ogq-text-body-md-tracking);
+  font-weight: var(--ogq-text-body-md-weight);
+}
+.ogq-text-body-sm {
+  font-size: var(--ogq-text-body-sm-size);
+  line-height: var(--ogq-text-body-sm-line);
+  letter-spacing: var(--ogq-text-body-sm-tracking);
+  font-weight: var(--ogq-text-body-sm-weight);
+}
+.ogq-text-caption {
+  font-size: var(--ogq-text-caption-size);
+  line-height: var(--ogq-text-caption-line);
+  letter-spacing: var(--ogq-text-caption-tracking);
+  font-weight: var(--ogq-text-caption-weight);
+}
+.ogq-text-overline {
+  font-size: var(--ogq-text-overline-size);
+  line-height: var(--ogq-text-overline-line);
+  letter-spacing: var(--ogq-text-overline-tracking);
+  font-weight: var(--ogq-text-overline-weight);
+}
+
+/* Shadow Utility Classes */
+.ogq-shadow-xs { box-shadow: var(--ogq-shadow-xs); }
+.ogq-shadow-sm { box-shadow: var(--ogq-shadow-sm); }
+.ogq-shadow-md { box-shadow: var(--ogq-shadow-md); }
+.ogq-shadow-lg { box-shadow: var(--ogq-shadow-lg); }
+.ogq-shadow-xl { box-shadow: var(--ogq-shadow-xl); }
+.ogq-shadow-card { box-shadow: var(--ogq-shadow-card); }
+
+/* Elevation Utility Classes */
+.ogq-elevation-0 { box-shadow: var(--ogq-elevation-0); }
+.ogq-elevation-1 { box-shadow: var(--ogq-elevation-1); }
+.ogq-elevation-2 { box-shadow: var(--ogq-elevation-2); }
+.ogq-elevation-3 { box-shadow: var(--ogq-elevation-3); }
+.ogq-elevation-4 { box-shadow: var(--ogq-elevation-4); }
+.ogq-elevation-5 { box-shadow: var(--ogq-elevation-5); }
