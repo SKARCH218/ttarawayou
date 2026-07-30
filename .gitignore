@@ -7,3 +7,14 @@ Thumbs.db
 
 # Claude Code 내부 세션 데이터
 .omc/
+
+# API 키 (절대 커밋 금지)
+.env
+**/.env
+
+# 빌드 산출물
+**/target/
+**/build/
+**/node_modules/
+**/.gradle/
+**/local.properties

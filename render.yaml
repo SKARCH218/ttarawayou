@@ -1,0 +1,15 @@
+# Render Blueprint — https://render.com 에서 New → Blueprint 로 이 저장소를 연결하면 자동 배포됩니다.
+# 자세한 절차: docs/제출킷_배포_가이드.md
+services:
+  - type: web
+    name: ttarawayou
+    runtime: docker
+    plan: free
+    rootDir: code
+    dockerfilePath: ./backend-kotlin/Dockerfile
+    dockerContext: .
+    healthCheckPath: /api/wallet
+    envVars:
+      - key: LMSTUDIO_ENABLED
+        value: "false"
+      # 실 데이터 연동 시 대시보드에서 추가: TMAP_APP_KEY, DATA_GO_KR_API_KEY, ODSAY_API_KEY

@@ -1,0 +1,43 @@
+server:
+  port: ${PORT:8080}
+  address: 0.0.0.0
+
+spring:
+  datasource:
+    url: jdbc:h2:mem:tripdb;DB_CLOSE_DELAY=-1
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    open-in-view: false
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+
+# ODsay 대중교통 API 키 (없으면 거리 기반 추정으로 자동 폴백)
+odsay:
+  api-key: ${ODSAY_API_KEY:}
+
+osrm:
+  base-url: https://router.project-osrm.org
+
+# 공공데이터포털(data.go.kr) 인증키 — 국토교통부(TAGO) 버스노선/도착정보
+# 키가 없으면 자동 폴백
+datago:
+  api-key: ${DATA_GO_KR_API_KEY:}
+
+# SK open API (TMAP) — 보행자/대중교통 길찾기 + 전국 POI(관광지·숙소·음식점)
+# 키가 없거나 쿼터 초과(429)면 충남·대전 시드 데이터로 자동 폴백
+tmap:
+  app-key: ${TMAP_APP_KEY:}
+
+# LM Studio 로컬 AI (OpenAI 호환 API). 꺼져 있거나 실패하면 휴리스틱 알고리즘으로 자동 폴백
+lmstudio:
+  base-url: ${LMSTUDIO_BASE_URL:http://127.0.0.1:1234/v1}
+  model: ${LMSTUDIO_MODEL:google/gemma-4-26b-a4b-qat}
+  enabled: ${LMSTUDIO_ENABLED:true}
+  # AI 응답이 이 시간을 넘기면 휴리스틱 폴백 (느린 로컬 모델은 값을 늘릴 것)
+  timeout-ms: ${LMSTUDIO_TIMEOUT_MS:20000}
