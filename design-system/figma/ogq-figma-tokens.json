@@ -1,0 +1,115 @@
+{
+  "OGQ Design System": {
+    "color": {
+      "mono": {
+        "000": { "value": "#ffffff", "type": "color" },
+        "010": { "value": "#fcfdfd", "type": "color" },
+        "030": { "value": "#f9fbfb", "type": "color" },
+        "050": { "value": "#f4f6f6", "type": "color" },
+        "080": { "value": "#eef1f1", "type": "color" },
+        "100": { "value": "#d8dfdf", "type": "color" },
+        "200": { "value": "#a7b6b9", "type": "color" },
+        "300": { "value": "#89989c", "type": "color" },
+        "400": { "value": "#7d8d92", "type": "color" },
+        "500": { "value": "#76888f", "type": "color" },
+        "600": { "value": "#6c7e84", "type": "color" },
+        "700": { "value": "#57676b", "type": "color" },
+        "800": { "value": "#425052", "type": "color" },
+        "900": { "value": "#262d2e", "type": "color" },
+        "990": { "value": "#262d2e", "type": "color" }
+      },
+      "primary": {
+        "010": { "value": "#fbfdfc", "type": "color" },
+        "030": { "value": "#eef7f4", "type": "color" },
+        "050": { "value": "#dff4ea", "type": "color" },
+        "080": { "value": "#cbecdf", "type": "color" },
+        "100": { "value": "#b5e5d7", "type": "color" },
+        "200": { "value": "#9bdfcc", "type": "color" },
+        "300": { "value": "#7fdec1", "type": "color" },
+        "400": { "value": "#58dab1", "type": "color" },
+        "500": { "value": "#32d29d", "type": "color" },
+        "600": { "value": "#00c389", "type": "color", "description": "Brand Primary" },
+        "700": { "value": "#00b57f", "type": "color" },
+        "800": { "value": "#00996e", "type": "color" },
+        "900": { "value": "#007a58", "type": "color" },
+        "990": { "value": "#006147", "type": "color" }
+      },
+      "secondary": {
+        "010": { "value": "#fbfbfe", "type": "color" },
+        "030": { "value": "#f8f6fe", "type": "color" },
+        "050": { "value": "#ebe8fc", "type": "color" },
+        "080": { "value": "#e0dafb", "type": "color" },
+        "100": { "value": "#d2c8f9", "type": "color" },
+        "200": { "value": "#bfb0f2", "type": "color" },
+        "300": { "value": "#a793ec", "type": "color" },
+        "400": { "value": "#947be5", "type": "color" },
+        "500": { "value": "#7e5ae2", "type": "color" },
+        "600": { "value": "#703fe4", "type": "color", "description": "Brand Secondary" },
+        "700": { "value": "#5b1dcd", "type": "color" },
+        "800": { "value": "#4917a6", "type": "color" },
+        "900": { "value": "#37117e", "type": "color" },
+        "990": { "value": "#290d5e", "type": "color" }
+      },
+      "semantic": {
+        "success": { "value": "#00c389", "type": "color" },
+        "warning": { "value": "#ff9800", "type": "color" },
+        "error": { "value": "#e21235", "type": "color" },
+        "info": { "value": "#1384d7", "type": "color" }
+      }
+    },
+    "spacing": {
+      "0": { "value": "0", "type": "spacing" },
+      "2": { "value": "2", "type": "spacing" },
+      "4": { "value": "4", "type": "spacing" },
+      "6": { "value": "6", "type": "spacing" },
+      "8": { "value": "8", "type": "spacing" },
+      "10": { "value": "10", "type": "spacing" },
+      "12": { "value": "12", "type": "spacing" },
+      "16": { "value": "16", "type": "spacing" },
+      "20": { "value": "20", "type": "spacing" },
+      "24": { "value": "24", "type": "spacing" },
+      "28": { "value": "28", "type": "spacing" },
+      "32": { "value": "32", "type": "spacing" },
+      "40": { "value": "40", "type": "spacing" },
+      "48": { "value": "48", "type": "spacing" },
+      "64": { "value": "64", "type": "spacing" },
+      "80": { "value": "80", "type": "spacing" },
+      "120": { "value": "120", "type": "spacing" }
+    },
+    "borderRadius": {
+      "none": { "value": "0", "type": "borderRadius" },
+      "sm": { "value": "4", "type": "borderRadius" },
+      "r6": { "value": "6", "type": "borderRadius" },
+      "md": { "value": "8", "type": "borderRadius" },
+      "lg": { "value": "12", "type": "borderRadius" },
+      "xl": { "value": "16", "type": "borderRadius" },
+      "2xl": { "value": "20", "type": "borderRadius" },
+      "full": { "value": "1000", "type": "borderRadius" }
+    },
+    "typography": {
+      "display-xl": { "value": { "fontFamily": "Pretendard Variable", "fontSize": "56", "lineHeight": "62", "letterSpacing": "-1.4", "fontWeight": "Bold" }, "type": "typography" },
+      "display-lg": { "value": { "fontFamily": "Pretendard Variable", "fontSize": "48", "lineHeight": "55", "letterSpacing": "-0.96", "fontWeight": "Bold" }, "type": "typography" },
+      "display-md": { "value": { "fontFamily": "Pretendard Variable", "fontSize": "36", "lineHeight": "43", "letterSpacing": "-0.54", "fontWeight": "SemiBold" }, "type": "typography" },
+      "heading-xl": { "value": { "fontFamily": "Pretendard Variable", "fontSize": "30", "lineHeight": "38", "letterSpacing": "-0.3", "fontWeight": "SemiBold" }, "type": "typography" },
+      "heading-lg": { "value": { "fontFamily": "Pretendard Variable", "fontSize": "24", "lineHeight": "31", "letterSpacing": "-0.12", "fontWeight": "SemiBold" }, "type": "typography" },
+      "heading-md": { "value": { "fontFamily": "Pretendard Variable", "fontSize": "20", "lineHeight": "28", "letterSpacing": "0", "fontWeight": "SemiBold" }, "type": "typography" },
+      "heading-sm": { "value": { "fontFamily": "Pretendard Variable", "fontSize": "18", "lineHeight": "25", "letterSpacing": "0", "fontWeight": "Medium" }, "type": "typography" },
+      "body-lg": { "value": { "fontFamily": "Pretendard Variable", "fontSize": "18", "lineHeight": "29", "letterSpacing": "0", "fontWeight": "Regular" }, "type": "typography" },
+      "body-md": { "value": { "fontFamily": "Pretendard Variable", "fontSize": "16", "lineHeight": "26", "letterSpacing": "0", "fontWeight": "Regular" }, "type": "typography" },
+      "body-sm": { "value": { "fontFamily": "Pretendard Variable", "fontSize": "14", "lineHeight": "21", "letterSpacing": "0.07", "fontWeight": "Regular" }, "type": "typography" },
+      "caption": { "value": { "fontFamily": "Pretendard Variable", "fontSize": "12", "lineHeight": "18", "letterSpacing": "0.12", "fontWeight": "Regular" }, "type": "typography" },
+      "overline": { "value": { "fontFamily": "Pretendard Variable", "fontSize": "11", "lineHeight": "17", "letterSpacing": "0.88", "fontWeight": "SemiBold" }, "type": "typography" }
+    },
+    "shadow": {
+      "xs": { "value": { "x": "0", "y": "1", "blur": "2", "spread": "0", "color": "rgba(0,0,0,0.05)" }, "type": "boxShadow" },
+      "sm": { "value": { "x": "0", "y": "1", "blur": "3", "spread": "0", "color": "rgba(0,0,0,0.1)" }, "type": "boxShadow" },
+      "md": { "value": { "x": "0", "y": "4", "blur": "6", "spread": "-1", "color": "rgba(0,0,0,0.1)" }, "type": "boxShadow" },
+      "lg": { "value": { "x": "0", "y": "10", "blur": "15", "spread": "-3", "color": "rgba(0,0,0,0.1)" }, "type": "boxShadow" },
+      "xl": { "value": { "x": "0", "y": "20", "blur": "25", "spread": "-5", "color": "rgba(0,0,0,0.1)" }, "type": "boxShadow" }
+    }
+  },
+  "$themes": [],
+  "$metadata": {
+    "tokenSetOrder": ["OGQ Design System"]
+  }
+}
