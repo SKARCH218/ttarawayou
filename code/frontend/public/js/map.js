@@ -1,5 +1,5 @@
 /**
- * 미스터리 내비게이션 (GPS 전용).
+ * 트레빗 내비게이션 (GPS + 데모 모드).
  * - 지도 확대/축소·드래그 완전 잠금, 항상 내 위치 중심(반경 약 10~20m)
  * - 여정 시작 지점 = 지도를 연 순간의 현재 위치.
  *   계획된 출발점과 30m 이상 떨어져 있으면 첫 구간을 현재 위치 기준으로 재계산(OSRM)
@@ -29,14 +29,14 @@
   const stops = dayPlan.stops;
   const legs = dayPlan.legs;
 
-  const ZOOM = 18;             // TMAP 고배율 줌 (한국 상세 지도)
+  const ZOOM = 18;             // 고배율 줌 (도보 안내용, 화면 가로 약 100m)
   const ARRIVE_RADIUS = 20;    // 도착 판정 반경(m)
   const OFFROUTE_DIST = 40;    // 경로 이탈 판정(m)
   const FAR_OFF_DIST = 250;    // 이만큼 크게 벗어나면 구간 종류와 무관하게 재탐색(m)
   const REVEAL_AHEAD = 130;    // 앞으로 공개할 경로 길이(m)
   const REROUTE_DIST = 30;     // 계획된 출발점과 이만큼 떨어져 있으면 재계산(m)
 
-  // ---------- 지도: Leaflet + OSM (키 불필요 · 줌/드래그 완전 잠금) ----------
+  // ---------- 지도: Leaflet (키 불필요 · 줌/드래그 완전 잠금) ----------
   const start = stops[0];
   const map = L.map('map', {
     zoomControl: false,
@@ -48,11 +48,32 @@
     touchZoom: false,
     tap: false,
   }).setView([start.latitude, start.longitude], ZOOM);
-  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: ZOOM + 2,
-    maxNativeZoom: 19,
-    attribution: '&copy; OpenStreetMap',
-  }).addTo(map);
+
+  /**
+   * 타일 소스는 CARTO Positron(무료·키 불필요·상업 CDN).
+   * OSM 공식 타일 서버(tile.openstreetmap.org)는 앱 트래픽을 차단하므로 쓰지 않는다
+   * — 차단되면 타일 자리에 "Access blocked" 이미지가 그려져 지도가 깨져 보인다.
+   * 이 소스마저 실패하면 배경만 남기고 안내를 띄운다(경로·마커는 그대로 동작).
+   */
+  const tiles = L.tileLayer(
+    'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+    {
+      subdomains: 'abcd',
+      maxZoom: ZOOM + 2,
+      maxNativeZoom: 19,
+      attribution: '&copy; OpenStreetMap &copy; CARTO',
+      crossOrigin: true,
+    }
+  ).addTo(map);
+
+  let tileErrors = 0;
+  tiles.on('tileerror', () => {
+    if (++tileErrors === 6) {
+      document.getElementById('map').style.background = 'var(--ogq-color-mono-050)';
+      const el = document.getElementById('statusSub');
+      if (el) el.textContent = '지도 배경을 불러오지 못했어요 — 경로 안내는 그대로 동작해요';
+    }
+  });
 
   function setCenter(lat, lng) {
     map.setView([lat, lng], ZOOM, { animate: false });
@@ -97,6 +118,7 @@
 
   // ---------- 상태 ----------
   let currentLeg = 0;          // 지금 따라가는 구간 인덱스 (목적지는 stops[currentLeg+1])
+  let legPathVersion = 0;      // 경로가 교체될 때마다 증가 (데모 시뮬레이터 재동기화용)
   let finished = false;
   let overlayOpen = false;
   let rerouteChecked = false;  // 최초 GPS 수신 시 1회만 출발 경로 재계산
@@ -113,7 +135,7 @@
   const $ = (id) => document.getElementById(id);
   const fmtDist = (m) => (m >= 1000 ? `${(m / 1000).toFixed(1)}km` : `${Math.round(m)}m`);
 
-  /** 하단 안내 박스: 도보면 미스터리 문구, 대중교통이면 상세 탑승 정보 */
+  /** 하단 안내 박스: 도보면 간단 안내, 대중교통이면 상세 탑승 정보 */
   function updateHintBox() {
     if (finished) return;
     const l = legs[currentLeg];
@@ -137,7 +159,7 @@
         '<span><b>보라색 길</b>을 따라가세요</span>';
     }
   }
-  $('statusTitle').textContent = `Day ${day} 미스터리 여정`;
+  $('statusTitle').textContent = `Day ${day} 여정`;
   updateProgressPill();
 
   $('backBtn').addEventListener('click', () => (location.href = 'plan.html'));
@@ -269,6 +291,7 @@
     };
     walkedPath.setLatLngs([]);
     ridingBus = false;
+    legPathVersion += 1; // 데모 시뮬레이터가 새 경로로 다시 맞추게 한다
     updateLegMarkers(); // 구간이 도보로 바뀌면 정류장 마커 제거, 목적지 ❓는 유지
   }
 
@@ -404,8 +427,21 @@
       offStreak = 0;
     }
 
-    // 앞부분만 조금씩 공개 — 항상 내 발밑에서 경로까지 이어지도록 연결선을 앞에 붙인다
-    revealedPath.setLatLngs(conn.concat(pathAhead(proj, pts, REVEAL_AHEAD)));
+    // 앞부분만 조금씩 공개 — 항상 내 발밑에서 경로까지 이어지도록 연결선을 앞에 붙인다.
+    // 경로가 목적지에 못 미치고 끝나면(버스 노선·도로 스냅) 마지막 구간을 목적지까지 이어 준다.
+    const ahead = conn.concat(pathAhead(proj, pts, REVEAL_AHEAD));
+    const tail = ahead[ahead.length - 1];
+    const nextStop = stops[currentLeg + 1];
+    if (nextStop) {
+      const tailGap = distanceMeters(tail[0], tail[1], nextStop.latitude, nextStop.longitude);
+      const pathEnd = pts[pts.length - 1];
+      const endsShort = distanceMeters(pathEnd[0], pathEnd[1],
+        nextStop.latitude, nextStop.longitude) > 25;
+      if (endsShort && tailGap > 5 && tailGap <= REVEAL_AHEAD) {
+        ahead.push([nextStop.latitude, nextStop.longitude]);
+      }
+    }
+    revealedPath.setLatLngs(ahead);
     // 지나온 흔적 (은은한 점선)
     walkedPath.setLatLngs(pts.slice(0, proj.segIdx + 1).concat([proj.point]));
 
@@ -498,7 +534,7 @@
       $('mysteryHint').innerHTML = next
         ? `<span style="font-size:20px;">🎉</span><span>Day ${day} 완료! 다음 여정(Day ${day + 1})은 `
           + `<b>${next.legs?.[0]?.departAt || '09:00'}</b>에 시작해요. 푹 쉬고 만나요!</span>`
-        : '<span style="font-size:20px;">🏆</span><span>모든 여정을 완료했어요! 미스터리 여행 끝!</span>';
+        : '<span style="font-size:20px;">🏆</span><span>모든 여정을 완료했어요</span>';
       revealedPath.setLatLngs([]);
       setTimeout(() => (location.href = 'plan.html'), 3200);
       return;
@@ -568,12 +604,14 @@
     $('statusSub').textContent = '데모 시뮬레이션으로 이동 중…';
 
     let legIdx = -1;
+    let pathVer = -1;   // 경로 교체(이탈 재탐색 등) 감지용
     let distAlong = 0;
     let pts = null;
     let cum = null; // 누적 거리 테이블
 
     function rebuild() {
       legIdx = currentLeg;
+      pathVer = legPathVersion;
       pts = path();
       distAlong = 0;
       cum = [0];
@@ -582,28 +620,57 @@
       }
     }
 
-    /** 경로 시작점부터 d 미터 지점의 좌표 (선형 보간) */
+    /**
+     * 경로 시작점부터 d 미터 지점의 좌표 (선형 보간).
+     * 경로가 목적지에 못 미치고 끝나는 경우(버스 노선이 하차 정류장에서 끝나거나
+     * 보행 경로가 도로에 스냅되는 경우)가 있어, 경로를 다 지난 뒤에는
+     * 마지막 지점 → 목적지 직선으로 계속 이동한다. 그래야 도착 판정까지 도달한다.
+     */
     function posAt(d) {
       const total = cum[cum.length - 1];
-      if (d >= total) return pts[pts.length - 1];
-      let i = 1;
-      while (cum[i] < d) i++;
-      const t = (d - cum[i - 1]) / Math.max(1e-9, cum[i] - cum[i - 1]);
+      const last = pts[pts.length - 1];
+      if (d < total) {
+        let i = 1;
+        while (cum[i] < d) i++;
+        const t = (d - cum[i - 1]) / Math.max(1e-9, cum[i] - cum[i - 1]);
+        return [
+          pts[i - 1][0] + (pts[i][0] - pts[i - 1][0]) * t,
+          pts[i - 1][1] + (pts[i][1] - pts[i - 1][1]) * t,
+        ];
+      }
+      const target = stops[currentLeg + 1];
+      if (!target) return last;
+      const gap = distanceMeters(last[0], last[1], target.latitude, target.longitude);
+      if (gap < 1) return last;
+      const t = Math.min(1, (d - total) / gap);
       return [
-        pts[i - 1][0] + (pts[i][0] - pts[i - 1][0]) * t,
-        pts[i - 1][1] + (pts[i][1] - pts[i - 1][1]) * t,
+        last[0] + (target.latitude - last[0]) * t,
+        last[1] + (target.longitude - last[1]) * t,
       ];
     }
 
     setInterval(() => {
       if (finished || overlayOpen || rerouting) return; // 공개 카드 동안 일시정지
-      if (legIdx !== currentLeg) rebuild();
+      // 구간이 넘어갔거나 경로가 교체되면 새 경로 기준으로 다시 맞춘다
+      if (legIdx !== currentLeg || pathVer !== legPathVersion) rebuild();
       // 도보 ~25m/틱, 버스 구간 ~110m/틱 (배속 반영)
       const base = legs[currentLeg].mode === 'TRANSIT' ? 110 : 25;
       distAlong += base * demoSpeed;
       const p = posAt(distAlong);
       lastFix = [p[0], p[1]];
       onPosition(p[0], p[1]);
+
+      // 데모는 반드시 목적지에 도달해야 한다.
+      // 경로를 다 지나고 목적지까지의 남은 직선거리까지 소진하면 도착으로 확정한다
+      // (실제 GPS와 달리 시뮬레이션은 경로 기하 오차로 멈춰서는 안 된다).
+      const target = stops[currentLeg + 1];
+      if (target && !overlayOpen) {
+        const end = pts[pts.length - 1];
+        const gap = distanceMeters(end[0], end[1], target.latitude, target.longitude);
+        const arrived = distAlong >= cum[cum.length - 1] + gap ||
+          distanceMeters(p[0], p[1], target.latitude, target.longitude) <= ARRIVE_RADIUS;
+        if (arrived) reveal(target);
+      }
     }, TICK_MS);
   }
 
