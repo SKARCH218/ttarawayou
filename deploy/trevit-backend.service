@@ -1,0 +1,33 @@
+# 트레빗 백엔드 (node2 / 10.8.1.102)
+#
+#   sudo cp trevit-backend.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now trevit-backend
+#   sudo systemctl status trevit-backend
+#   journalctl -u trevit-backend -f          # 로그 보기
+#
+# 사전 준비: /opt/trevit/trevit-api.jar 배치, /opt/trevit/trevit.env 작성(아래 .env.production.example 참고)
+
+[Unit]
+Description=Trevit backend (Kotlin Spring Boot)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=trevit
+WorkingDirectory=/opt/trevit
+EnvironmentFile=/opt/trevit/trevit.env
+ExecStart=/usr/bin/java -Xmx1g -jar /opt/trevit/trevit-api.jar --server.port=8080
+
+# VPN·학교망이 끊겼다 붙어도 스스로 살아나게
+Restart=always
+RestartSec=10
+
+# 로그는 journald 로
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=trevit
+
+[Install]
+WantedBy=multi-user.target
