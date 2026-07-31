@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -74,8 +73,6 @@ val WebMintDeep = Color(0xFF00B57F)
 /** primary-050 — 선택된 칩 배경 */
 val WebMintPale = Color(0xFFDAF5EC)
 
-/** primary-800 — 충전 버튼 글자 */
-private val WebMintDarkText = Color(0xFF009969)
 
 /** 선택된 칩 글자 (primary-700 계열) */
 private val WebMintText = Color(0xFF00805C)
@@ -186,7 +183,6 @@ fun webChipOnBorder(): Color = if (isSystemInDarkTheme()) Color(0xFF2E7C66) else
 // ─────────────────────────────────────────────────────────────
 // 모양 (ogq-radius-*)
 // ─────────────────────────────────────────────────────────────
-private val ShapeMd = RoundedCornerShape(8.dp)
 private val ShapeLg = RoundedCornerShape(12.dp)
 private val CtaShape = RoundedCornerShape(16.dp)      // radius-xl
 private val CardShape = RoundedCornerShape(20.dp)     // radius-2xl

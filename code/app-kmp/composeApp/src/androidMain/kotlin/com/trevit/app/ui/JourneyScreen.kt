@@ -208,7 +208,7 @@ fun JourneyScreen(state: AppState, dayIndex: Int) {
 
             // ---- 웹 `.mystery-hint` — 지도 위에 뜨는 안내 ----
             MysteryHint(
-                if (playing) "보라색 길을 따라가는 중" else "시뮬레이션을 눌러 길을 따라가세요",
+                if (playing) "보라색 길을 따라가는 중이에요" else "보라색 길을 따라가세요 — 시뮬레이션을 눌러 주세요",
                 Modifier.padding(horizontal = 16.dp),
             )
 
@@ -332,9 +332,9 @@ private fun JourneyMap(
             )
         }
 
-        // 남은 경로 (선명한 브랜드 컬러)
+        // 남은 경로 — 웹 map.js 와 같은 보라색 ("보라색 길을 따라가세요")
         for (i in legIndex + 1 until geoms.size) {
-            drawGeoPath(geoms[i].points, colorScheme.primary, 9f)
+            drawGeoPath(geoms[i].points, MysteryPurple, 9f)
         }
         val current = geoms[legIndex]
         val traveledPts = current.subPathTo(distOnLeg)
@@ -344,7 +344,7 @@ private fun JourneyMap(
             while (idx < current.cumulative.size && current.cumulative[idx] <= distOnLeg) idx++
             for (j in idx until current.points.size) add(current.points[j])
         }
-        drawGeoPath(remainingPts, colorScheme.primary, 9f)
+        drawGeoPath(remainingPts, MysteryPurple, 9f)
 
         // 지나온 경로 (회색 점선)
         for (i in 0 until legIndex) {
@@ -404,12 +404,13 @@ private fun JourneyMap(
         // 현재 위치 마커 (펄스)
         val (curLat, curLng) = current.positionAt(distOnLeg)
         val curOffset = projector.toOffset(curLat, curLng)
+        // 웹 `.user-marker` — 민트 점에 흰 테두리와 옅은 후광
         drawCircle(
-            colorScheme.tertiary.copy(alpha = (1f - pulse) * 0.35f),
+            WebMint.copy(alpha = (1f - pulse) * 0.35f),
             18f + pulse * 30f,
             curOffset,
         )
-        drawCircle(colorScheme.tertiary, 14f, curOffset)
+        drawCircle(WebMint, 14f, curOffset)
         drawCircle(Color.White, 14f, curOffset, style = Stroke(4f))
     }
 }

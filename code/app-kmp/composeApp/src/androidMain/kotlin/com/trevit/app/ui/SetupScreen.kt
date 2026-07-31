@@ -58,7 +58,6 @@ import com.trevit.app.BUDGET_STEP
 import com.trevit.app.MIN_BUDGET
 import com.trevit.app.R
 import com.trevit.app.REGIONS
-import com.trevit.app.Screen
 import kotlinx.coroutines.launch
 
 /**
@@ -340,7 +339,8 @@ private fun BudgetField(state: AppState, onCharge: () -> Unit) {
                     state.walletBalance?.let { "%,d 토큰".format(it) } ?: "…",
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Bold,
-                    color = WebOrangeDark,
+                    // warning-dark 는 어두운 배경에서 묻히므로 다크에서는 한 단계 밝게
+                    color = if (isDark()) WebOrange else WebOrangeDark,
                 )
             }
             ChargeButton(onCharge)
