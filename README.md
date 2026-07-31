@@ -159,17 +159,38 @@ docker build -f backend/Dockerfile -t trevit . && docker run -p 8080:8080 trevit
 ### 개발 과정에서 사용한 AI
 - **Claude (Anthropic)** — Claude Code로 Java→Kotlin 포팅, Compose 앱 개발, 데모 모드, 문서화 지원. 기획·아이디어·검증은 팀 수행
 
-### 오픈소스 / 외부 자문
-- Spring Boot, Leaflet, OSRM, Compose Multiplatform, Ktor, 토스페이스(토스) 등
-- 지도교사 김영우 · 충남권 창업아이디어 경진대회 멘토링
+### 오픈소스 패키지
+
+| 패키지 | 용도 | 라이선스 |
+|---|---|---|
+| Spring Boot 3.5 | 백엔드 프레임워크 | Apache-2.0 |
+| Kotlin / Compose Multiplatform | 앱 · 공용 모듈 | Apache-2.0 |
+| Ktor Client | 공용 API 클라이언트 | Apache-2.0 |
+| H2 Database | 인메모리 DB | MPL-2.0 / EPL-1.0 |
+| Leaflet | 지도 렌더링 | BSD-2-Clause |
+| Tossface | 이모지 폰트 | SIL OFL-1.1 |
+
+### 외부 API · 데이터
+
+| 서비스 | 용도 |
+|---|---|
+| TMAP API (SK텔레콤) | POI 검색 · 대중교통 경로 |
+| 국토교통부 TAGO | 실시간 버스 도착정보 |
+| ODsay | 대중교통 환승 경로 |
+| OSRM | 보행 경로 계산 |
+| CARTO Basemaps | 지도 타일 |
+
+### 외부 자문
+- 지도교사 **김영우** — 프로젝트 방향 및 발표 지도
+- 충남권 창업아이디어 경진대회 멘토링 — 사업성 검토 피드백
 
 ## 8. 팀 — PLAYLABS
 
 | 역할 | 이름 | 담당 |
 |---|---|---|
 | 대표 | 김태훈 (3학년) | 기획 총괄 · AI · 백엔드 |
-| 팀원 | 장한결 (3학년) | 데이터 · 서버 |
-| 팀원 | 이승주 (3학년) | UI/UX |
+| 팀원 | 장한결 (2학년) | 데이터 · 서버 |
+| 팀원 | 이승주 (2학년) | UI/UX |
 | 팀원 | 이윤호 (1학년) | QA · 테스트 |
 
 ## 9. 라이선스
