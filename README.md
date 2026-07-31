@@ -110,11 +110,32 @@ API 키 없이 바로 실행됩니다(수도권 시드 데이터 모드). 실 �
 
 ### Android 앱
 
+앱은 위 백엔드에 붙어 동작하므로 **백엔드를 먼저 띄워 주세요.**
+
 ```bash
 cd code/app-kmp
 ./gradlew :composeApp:assembleDebug
 # APK: composeApp/build/outputs/apk/debug/composeApp-debug.apk
 ```
+
+> JDK 21이 필요합니다(`gradle.properties`의 `org.gradle.java.home`에 고정). JDK 26에서는 AGP가 아직 동작하지 않습니다.
+
+**에뮬레이터에서 실행** — 기본 서버 주소가 `http://10.0.2.2:8080`(에뮬레이터에서 본 호스트)이라 설정 없이 바로 붙습니다.
+
+```bash
+adb install -r composeApp/build/outputs/apk/debug/composeApp-debug.apk
+adb shell monkey -p com.trevit.app -c android.intent.category.LAUNCHER 1
+```
+
+**실제 기기에서 실행** — APK를 폰으로 옮겨 설치한 뒤(출처를 알 수 없는 앱 설치 허용 필요),
+폰과 PC를 **같은 Wi-Fi**에 두고 앱 홈 화면 우상단 **설정(⚙)** 에서 서버 주소를 PC의 LAN IP로 바꿉니다.
+
+```
+http://<PC의 LAN IP>:8080      # 예: http://192.168.0.10:8080
+# macOS에서 IP 확인: ipconfig getifaddr en0
+```
+
+배포된 서버가 있다면 그 주소(`https://...`)를 넣어도 됩니다. 이 경우 PC를 켜둘 필요가 없습니다.
 
 ### Docker
 
