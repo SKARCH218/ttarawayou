@@ -2,11 +2,11 @@
 
 <img src="design-system/brand/travit-logo-full.svg" width="200" alt="트레빗" />
 
-# 트레빗 (Trevit)
+# 트레빗 (Travit)
 
 **Travel + Trip + Navigator — AI가 여행의 모든 결정을 대신하는 서프라이즈 여행 내비게이터**
 
-제4회 NAVER OGQ마켓 AI Competition 출품작 · 팀 **Kims & Lee** (아산스마트팩토리마이스터고)
+제4회 NAVER OGQ마켓 AI Competition 출품작 · 팀 **PLAYLABS** (아산스마트팩토리마이스터고)
 2026 충남권 고교-대학 창업아이디어 경진대회 **최우수상(2위)** 아이디어("따라와유")의 리브랜딩·실구현
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
@@ -163,13 +163,13 @@ docker build -f backend/Dockerfile -t trevit . && docker run -p 8080:8080 trevit
 - Spring Boot, Leaflet, OSRM, Compose Multiplatform, Ktor, 토스페이스(토스) 등
 - 지도교사 김영우 · 충남권 창업아이디어 경진대회 멘토링
 
-## 8. 팀 — Kims & Lee
+## 8. 팀 — PLAYLABS
 
 | 역할 | 이름 | 담당 |
 |---|---|---|
 | 대표 | 김태훈 (3학년) | 기획 총괄 · AI · 백엔드 |
-| 팀원 | 김재원 (3학년) | 데이터 · 서버 |
-| 팀원 | 김준서 (3학년) | UI/UX |
+| 팀원 | 장한결 (3학년) | 데이터 · 서버 |
+| 팀원 | 이승주 (3학년) | UI/UX |
 | 팀원 | 이윤호 (1학년) | QA · 테스트 |
 
 ## 9. 라이선스
