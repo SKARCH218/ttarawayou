@@ -12,6 +12,10 @@ Thumbs.db
 .env
 **/.env
 
+# 실행 스크립트가 남기는 로그
+.backend.log
+.emulator.log
+
 # 빌드 산출물
 **/target/
 **/build/

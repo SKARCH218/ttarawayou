@@ -22,9 +22,10 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -161,6 +162,7 @@ fun ProfileScreen(state: AppState) {
                         onValueChange = { state.preferenceNote = it },
                         modifier = Modifier.fillMaxWidth(),
                         placeholder = { Text("예: 매운 음식 좋아요, 조용한 카페 위주로") },
+                        shape = RoundedCornerShape(12.dp),
                         minLines = 3,
                     )
                 }
@@ -232,15 +234,11 @@ private fun QuestionNavBar(state: AppState) {
                     }) { Text("건너뛰기") }
                     Spacer(Modifier.size(8.dp))
                 }
-                Button(
+                PrimaryCta(
+                    text = if (state.questionIndex == state.questionCount - 1) "플랜 만들기" else "다음",
                     onClick = { state.nextQuestion() },
-                    modifier = Modifier.height(48.dp),
-                ) {
-                    Text(
-                        if (state.questionIndex == state.questionCount - 1) "플랜 만들기" else "다음",
-                        style = MaterialTheme.typography.titleSmall,
-                    )
-                }
+                    modifier = Modifier.width(160.dp),
+                )
             }
         }
     }
@@ -263,14 +261,17 @@ private fun QuestionPage(
         contentAlignment = Alignment.Center,
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(
-                question.emoji,
-                fontSize = 80.sp,
-                lineHeight = 104.sp,
-                fontFamily = TossFaceFontFamily, // 이모지만 토스페이스로
-                textAlign = TextAlign.Center,
-            )
-            Spacer(Modifier.height(20.dp))
+            // 이모지 위아래 여백이 넓어 휑해 보이던 자리에 옅은 민트 후광을 깔아 시선을 모은다
+            EmojiHalo(size = 190.dp) {
+                Text(
+                    question.emoji,
+                    fontSize = 80.sp,
+                    lineHeight = 104.sp,
+                    fontFamily = TossFaceFontFamily, // 이모지만 토스페이스로
+                    textAlign = TextAlign.Center,
+                )
+            }
+            Spacer(Modifier.height(12.dp))
             Text(
                 question.title,
                 style = MaterialTheme.typography.headlineSmall,
@@ -295,10 +296,14 @@ private fun SingleChoice(
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         options.forEach { option ->
+            val isSelected = selected == option
             FilterChip(
-                selected = selected == option,
+                selected = isSelected,
                 onClick = { onSelect(option) },
                 label = { Text(option, style = MaterialTheme.typography.bodyLarge) },
+                shape = RoundedCornerShape(50),
+                colors = trevitChipColors(),
+                border = trevitChipBorder(isSelected),
             )
         }
     }
@@ -317,10 +322,14 @@ private fun MultiChoice(
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             options.forEach { option ->
+                val isSelected = option in selected
                 FilterChip(
-                    selected = option in selected,
+                    selected = isSelected,
                     onClick = { onToggle(option) },
                     label = { Text(option, style = MaterialTheme.typography.bodyLarge) },
+                    shape = RoundedCornerShape(50),
+                    colors = trevitChipColors(),
+                    border = trevitChipBorder(isSelected),
                 )
             }
         }
@@ -368,7 +377,8 @@ private fun MbtiAxis(
                 selected = selected == c,
                 onClick = { onSelect(if (selected == c) null else c) },
                 shape = SegmentedButtonDefaults.itemShape(index = i, count = 2),
-            ) { Text(c.toString()) }
+                colors = trevitSegmentedColors(),
+            ) { Text(c.toString(), style = MaterialTheme.typography.titleMedium) }
         }
     }
 }

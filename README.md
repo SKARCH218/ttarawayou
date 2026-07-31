@@ -120,12 +120,16 @@ cd code/app-kmp
 
 > JDK 21이 필요합니다(`gradle.properties`의 `org.gradle.java.home`에 고정). JDK 26에서는 AGP가 아직 동작하지 않습니다.
 
-**에뮬레이터에서 실행** — 기본 서버 주소가 `http://10.0.2.2:8080`(에뮬레이터에서 본 호스트)이라 설정 없이 바로 붙습니다.
+**한 번에 실행** — 백엔드·에뮬레이터를 확인해 꺼져 있으면 띄우고, APK를 설치·실행합니다.
 
 ```bash
-adb install -r composeApp/build/outputs/apk/debug/composeApp-debug.apk
-adb shell monkey -p com.trevit.app -c android.intent.category.LAUNCHER 1
+cd code
+./run-app.sh              # APK가 있으면 그대로 설치·실행
+./run-app.sh --build      # 코드를 고쳤을 때
+./run-app.sh --device     # USB로 연결한 실제 폰에 설치
 ```
+
+에뮬레이터는 기본 서버 주소가 `http://10.0.2.2:8080`(에뮬레이터에서 본 호스트)이라 설정 없이 바로 붙습니다.
 
 **실제 기기에서 실행** — APK를 폰으로 옮겨 설치한 뒤(출처를 알 수 없는 앱 설치 허용 필요),
 폰과 PC를 **같은 Wi-Fi**에 두고 앱 홈 화면 우상단 **설정(⚙)** 에서 서버 주소를 PC의 LAN IP로 바꿉니다.

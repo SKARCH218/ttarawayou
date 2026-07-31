@@ -1,6 +1,7 @@
 package com.trevit.app.ui
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -27,10 +28,17 @@ fun GeneratingScreen(state: AppState) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        CircularProgressIndicator()
+        // 스피너 뒤 은은한 민트 글로우 — 웹 로딩 오버레이의 민트 톤을 옮긴 것
+        Box(contentAlignment = Alignment.Center) {
+            MintGlow(size = 180.dp, alpha = 0.22f)
+            CircularProgressIndicator(color = WebMint, strokeWidth = 4.dp)
+        }
         Spacer(Modifier.height(24.dp))
-        Text("AI가 계획을 세우는 중", style = MaterialTheme.typography.titleMedium)
-        Spacer(Modifier.height(4.dp))
+        GradientTitle(
+            "AI가 계획을 세우는 중",
+            style = MaterialTheme.typography.titleLarge,
+        )
+        Spacer(Modifier.height(6.dp))
         Text(
             "최대 2분 정도 걸릴 수 있어요",
             style = MaterialTheme.typography.bodySmall,

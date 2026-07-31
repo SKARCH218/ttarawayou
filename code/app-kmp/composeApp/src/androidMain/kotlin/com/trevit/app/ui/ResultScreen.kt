@@ -11,15 +11,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AssistChip
-import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
@@ -34,6 +33,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.trevit.app.AppState
 import com.trevit.app.DURATIONS
@@ -56,7 +56,13 @@ fun ResultScreen(state: AppState) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(state.region?.let { "$it 여행" } ?: "여행 플랜") },
+                title = {
+                    GradientTitle(
+                        state.region?.let { "$it 여행" } ?: "여행 플랜",
+                        style = MaterialTheme.typography.headlineSmall,
+                        textAlign = TextAlign.Start,
+                    )
+                },
                 navigationIcon = {
                     IconButton(onClick = { state.screen = Screen.Home }) {
                         Icon(painterResource(R.drawable.ic_chevron_left), contentDescription = "뒤로")
@@ -82,23 +88,18 @@ fun ResultScreen(state: AppState) {
         bottomBar = {
             val allDone = state.completedDays >= plan.dayPlans.size
             val nextDay = min(state.completedDays, plan.dayPlans.size - 1)
-            Button(
+            PrimaryCta(
+                text = when {
+                    allDone -> "여행 완료"
+                    state.completedDays == 0 -> "여행 시작"
+                    else -> "DAY ${state.completedDays + 1} 시작"
+                },
                 onClick = { if (!allDone) state.screen = Screen.Journey(nextDay) },
                 enabled = !allDone,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(16.dp)
-                    .height(52.dp),
-            ) {
-                Text(
-                    when {
-                        allDone -> "여행 완료"
-                        state.completedDays == 0 -> "여행 시작"
-                        else -> "DAY ${state.completedDays + 1} 시작"
-                    },
-                    style = MaterialTheme.typography.titleMedium,
-                )
-            }
+                    .padding(16.dp),
+            )
         },
     ) { padding ->
         Column(
@@ -110,12 +111,13 @@ fun ResultScreen(state: AppState) {
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             plan.aiReason?.takeIf { it.isNotBlank() }?.let { reason ->
-                OutlinedCard(Modifier.fillMaxWidth()) {
-                    Column(Modifier.padding(14.dp)) {
+                TrevitCard(Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(16.dp)) {
                         Text(
                             "AI 추천 이유",
                             style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.Bold,
+                            color = WebMintDeep,
                         )
                         Spacer(Modifier.height(6.dp))
                         Text(reason, style = MaterialTheme.typography.bodyMedium)
@@ -123,16 +125,16 @@ fun ResultScreen(state: AppState) {
                 }
             }
 
-            OutlinedCard(Modifier.fillMaxWidth()) {
+            TrevitCard(Modifier.fillMaxWidth()) {
                 Row(
                     Modifier
                         .fillMaxWidth()
-                        .padding(14.dp),
+                        .padding(16.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
                     SummaryItem("예산", won(plan.budget))
                     SummaryItem("총비용", won(plan.totalCost))
-                    SummaryItem("잔여", won(plan.remainingBudget))
+                    SummaryItem("잔여", won(plan.remainingBudget), accent = true)
                 }
             }
 
@@ -168,28 +170,42 @@ fun ResultScreen(state: AppState) {
 }
 
 @Composable
-private fun SummaryItem(label: String, value: String) {
+private fun SummaryItem(label: String, value: String, accent: Boolean = false) {
     Column {
         Text(
             label,
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Text(value, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+        Text(
+            value,
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.Bold,
+            color = if (accent) WebMintDeep else MaterialTheme.colorScheme.onSurface,
+        )
     }
 }
 
+/**
+ * 예산 배분 한 칸. 숫자만 있으면 단조로워서, 웹 `.bar-fill` 처럼
+ * 예산 대비 사용 비율을 가는 막대로 함께 보여준다.
+ */
 @Composable
 private fun BudgetCell(label: String, spent: Long, budget: Long, modifier: Modifier = Modifier) {
-    OutlinedCard(modifier) {
-        Column(Modifier.padding(12.dp)) {
+    val over = budget > 0 && spent > budget
+    val fraction = if (budget > 0) spent.toFloat() / budget else 0f
+    TrevitCard(modifier, shape = RoundedCornerShape(16.dp)) {
+        Column(Modifier.padding(14.dp)) {
             Text(
                 label,
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(Modifier.height(4.dp))
-            Text(won(spent), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+            Text(won(spent), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(8.dp))
+            BudgetBar(fraction, overBudget = over)
+            Spacer(Modifier.height(6.dp))
             Text(
                 "예산 ${won(budget)}",
                 style = MaterialTheme.typography.labelSmall,
@@ -201,8 +217,8 @@ private fun BudgetCell(label: String, spent: Long, budget: Long, modifier: Modif
 
 @Composable
 private fun DayTimeline(dayPlan: DayPlanDto, revealed: Boolean) {
-    OutlinedCard(Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(14.dp)) {
+    TrevitCard(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp)) {
             dayPlan.stops.forEachIndexed { i, stop ->
                 val isStart = stop.type == "START" || i == 0
                 val show = revealed || isStart

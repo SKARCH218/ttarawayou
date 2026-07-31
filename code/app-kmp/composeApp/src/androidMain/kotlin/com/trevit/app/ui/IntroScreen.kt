@@ -97,16 +97,24 @@ fun IntroScreen(state: AppState) {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {
-            Icon(
-                painter = painterResource(R.drawable.ic_travit_symbol),
-                contentDescription = "트레빗",
-                tint = BrandMint,
-                modifier = Modifier
-                    .width(148.dp)
-                    .height(92.dp)
-                    .alpha(symbolAlpha)
-                    .scale(symbolScale),
-            )
+            // 웹 인트로의 `box-shadow: 0 0 40px rgba(0,195,137,.35)` — 심볼과 함께 페이드 인
+            Box(contentAlignment = Alignment.Center) {
+                MintGlow(
+                    size = 260.dp,
+                    alpha = 0.35f,
+                    modifier = Modifier.alpha(symbolAlpha),
+                )
+                Icon(
+                    painter = painterResource(R.drawable.ic_travit_symbol),
+                    contentDescription = "트레빗",
+                    tint = BrandMint,
+                    modifier = Modifier
+                        .width(148.dp)
+                        .height(92.dp)
+                        .alpha(symbolAlpha)
+                        .scale(symbolScale),
+                )
+            }
             Spacer(Modifier.height(20.dp))
             Icon(
                 painter = painterResource(R.drawable.ic_travit_wordmark),
