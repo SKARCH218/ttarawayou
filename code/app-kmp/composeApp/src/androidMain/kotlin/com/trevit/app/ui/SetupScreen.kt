@@ -27,6 +27,7 @@ import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -130,6 +131,12 @@ fun SetupScreen(state: AppState) {
                     value = state.budget,
                     onValueChange = { state.budget = (it / 10_000f).roundToInt() * 10_000f },
                     valueRange = 50_000f..1_000_000f,
+                    // 기본값은 Material 보조색(보라)이라 브랜드와 어긋난다 — 민트로 고정
+                    colors = SliderDefaults.colors(
+                        thumbColor = WebMint,
+                        activeTrackColor = WebMint,
+                        inactiveTrackColor = WebMintPale,
+                    ),
                 )
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Text(
