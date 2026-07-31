@@ -83,7 +83,8 @@ class AppState(
     var completedDays by mutableIntStateOf(0)
 
     // ---- 여행 설정 (웹 index.html + setup.js 와 같은 항목·한계) ----
-    var region by mutableStateOf<String?>(null)
+    // 웹 select 의 첫 항목이 서울이라 앱도 같은 기본값에서 출발한다
+    var region by mutableStateOf<String?>(REGIONS.first())
     var purpose by mutableStateOf<String?>(null)
     var budget by mutableStateOf(300_000L)
     var days by mutableIntStateOf(2)            // 1~3일

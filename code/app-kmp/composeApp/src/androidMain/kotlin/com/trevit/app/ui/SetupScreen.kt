@@ -4,12 +4,11 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -18,6 +17,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
@@ -26,8 +26,6 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -184,7 +182,6 @@ fun SetupScreen(state: AppState) {
 }
 
 /** 웹 `.field` 의 지역 칸. select 대신 검색어 + 칩(`.chip`)으로 고른다. */
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun RegionField(
     query: String,
@@ -230,10 +227,13 @@ private fun RegionField(
             }
         }
         Spacer(Modifier.height(10.dp))
-        // 웹 `.chips { gap: 8px }`
-        FlowRow(
+        // 웹 `.chips { gap: 8px }`.
+        // 웹의 select 는 한 줄만 차지하므로, 칩도 가로 스크롤 한 줄로 두어 화면 높이를 맞춘다.
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             REGIONS.filter { query.isBlank() || it.contains(query.trim()) }.forEach { region ->
                 WebChip(region, selected == region, { onSelect(region) }, compact = true)
@@ -264,8 +264,8 @@ private fun BudgetField(state: AppState, onCharge: () -> Unit) {
                 onCancel = { editing = false },
             )
         } else {
-            // 웹 `.budget-display` — 숫자(32px, primary-700, 점선 밑줄) + "토큰"
-            val underline = WebMintPale
+            // 웹 `.budget-display` — 숫자(32px, primary-700, primary-200 점선 밑줄) + "토큰"
+            val underline = Color(0xFF9BDFCC)
             val interaction = remember { MutableInteractionSource() }
             Row(
                 Modifier.clickable(interactionSource = interaction, indication = null) {
@@ -285,7 +285,9 @@ private fun BudgetField(state: AppState, onCharge: () -> Unit) {
                             start = Offset(0f, size.height),
                             end = Offset(size.width, size.height),
                             strokeWidth = 2.dp.toPx(),
-                            pathEffect = PathEffect.dashPathEffect(floatArrayOf(8f, 6f)),
+                            pathEffect = PathEffect.dashPathEffect(
+                                floatArrayOf(3.dp.toPx(), 3.dp.toPx()),
+                            ),
                         )
                     },
                 )
@@ -312,7 +314,7 @@ private fun BudgetField(state: AppState, onCharge: () -> Unit) {
             contentAlignment = Alignment.Center,
         ) {
             val max = state.maxBudget.coerceAtLeast(MIN_BUDGET + BUDGET_STEP)
-            Slider(
+            WebSlider(
                 value = state.budget.coerceIn(MIN_BUDGET, max).toFloat(),
                 onValueChange = {
                     state.budget = state.clampBudget(
@@ -320,11 +322,6 @@ private fun BudgetField(state: AppState, onCharge: () -> Unit) {
                     )
                 },
                 valueRange = MIN_BUDGET.toFloat()..max.toFloat(),
-                colors = SliderDefaults.colors(
-                    thumbColor = WebMint,
-                    activeTrackColor = WebMint,
-                    inactiveTrackColor = webBorder(),
-                ),
             )
         }
 

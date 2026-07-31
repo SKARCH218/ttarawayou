@@ -24,7 +24,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -40,6 +43,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -48,6 +52,7 @@ import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
+import com.trevit.app.R
 
 /**
  * 웹 데모(frontend/public/css/style.css)의 시각 규칙을 Compose로 옮긴 공용 컴포넌트.
@@ -475,6 +480,56 @@ fun BudgetBar(
     }
 }
 
+/**
+ * 웹 `.budget-slider` — 10dp 트랙(채움 민트 / 남은 곳 mono-080)에
+ * 흰 속을 민트 테두리로 두른 26dp 손잡이.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun WebSlider(
+    value: Float,
+    onValueChange: (Float) -> Unit,
+    valueRange: ClosedFloatingPointRange<Float>,
+    modifier: Modifier = Modifier,
+) {
+    val track = webBorder()
+    val thumbFill = webSurface()
+    Slider(
+        value = value,
+        onValueChange = onValueChange,
+        valueRange = valueRange,
+        modifier = modifier,
+        track = { sliderState ->
+            val span = sliderState.valueRange.endInclusive - sliderState.valueRange.start
+            val fraction =
+                if (span > 0f) (sliderState.value - sliderState.valueRange.start) / span else 0f
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .height(10.dp)
+                    .clip(PillShape)
+                    .background(track),
+            ) {
+                Box(
+                    Modifier
+                        .fillMaxWidth(fraction.coerceIn(0f, 1f))
+                        .fillMaxHeight()
+                        .background(WebMint, PillShape),
+                )
+            }
+        },
+        thumb = {
+            Box(
+                Modifier
+                    .size(26.dp)
+                    .shadow(4.dp, CircleShape, spotColor = WebMint, ambientColor = WebMint)
+                    .background(thumbFill, CircleShape)
+                    .border(4.dp, WebMint, CircleShape),
+            )
+        },
+    )
+}
+
 /** 웹 `.cost-row + .cost-row` 의 `border-top: 1px dashed mono-080` */
 @Composable
 fun DashedDivider(modifier: Modifier = Modifier) {
@@ -484,12 +539,13 @@ fun DashedDivider(modifier: Modifier = Modifier) {
             .fillMaxWidth()
             .height(1.dp)
             .drawBehind {
+                val dash = 3.dp.toPx()
                 drawLine(
                     color = color,
                     start = Offset(0f, 0f),
                     end = Offset(size.width, 0f),
                     strokeWidth = size.height,
-                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 6f)),
+                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(dash, dash)),
                 )
             },
     )
@@ -533,7 +589,7 @@ fun WebStepper(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        StepperButton("−", enabled = value > range.first) { onChange(value - 1) }
+        StepperButton(R.drawable.ic_remove_minus, "감소", value > range.first) { onChange(value - 1) }
         Column(
             Modifier.weight(1f),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -547,12 +603,18 @@ fun WebStepper(
                 color = webTextDim(),
             )
         }
-        StepperButton("＋", enabled = value < range.last) { onChange(value + 1) }
+        StepperButton(R.drawable.ic_add_plus, "증가", value < range.last) { onChange(value + 1) }
     }
 }
 
+/** 웹 `.stepper button` — 46dp 정사각, mono-050 배경, 안에는 디자인 시스템 PNG 아이콘 */
 @Composable
-private fun StepperButton(glyph: String, enabled: Boolean, onClick: () -> Unit) {
+private fun StepperButton(
+    icon: Int,
+    description: String,
+    enabled: Boolean,
+    onClick: () -> Unit,
+) {
     Surface(
         onClick = onClick,
         enabled = enabled,
@@ -562,11 +624,11 @@ private fun StepperButton(glyph: String, enabled: Boolean, onClick: () -> Unit) 
         border = BorderStroke(1.dp, webBorder()),
     ) {
         Box(contentAlignment = Alignment.Center) {
-            Text(
-                glyph,
-                fontSize = 22.sp,
-                fontWeight = FontWeight.Bold,
-                color = if (enabled) webTextChip() else webTextDecor(),
+            Icon(
+                painterResource(icon),
+                contentDescription = description,
+                tint = if (enabled) webTextChip() else webTextDecor(),
+                modifier = Modifier.size(22.dp),
             )
         }
     }

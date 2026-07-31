@@ -18,7 +18,7 @@ Type=simple
 User=trevit
 WorkingDirectory=/opt/trevit
 EnvironmentFile=/opt/trevit/trevit.env
-ExecStart=/usr/bin/java -Xmx1g -jar /opt/trevit/trevit-api.jar --server.port=8080
+ExecStart=/usr/bin/java -Xmx1g -jar /opt/trevit/trevit-api.jar --server.port=9090
 
 # VPN·학교망이 끊겼다 붙어도 스스로 살아나게
 Restart=always

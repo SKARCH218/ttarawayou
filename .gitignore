@@ -16,6 +16,9 @@ Thumbs.db
 .backend.log
 .emulator.log
 
+# 배포 묶음 (80MB — 필요할 때 build-bundle.sh 로 다시 만든다)
+deploy/trevit-deploy.tar.gz
+
 # 빌드 산출물
 **/target/
 **/build/

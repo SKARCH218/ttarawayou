@@ -23,18 +23,15 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -47,6 +44,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
@@ -58,6 +56,7 @@ import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.trevit.app.AppState
@@ -160,105 +159,75 @@ fun JourneyScreen(state: AppState, dayIndex: Int) {
                 .fillMaxSize()
                 .safeDrawingPadding(),
         ) {
-            // ---- 상단 안내 ----
-            Card(
+            // ---- 웹 `.map-topbar` — 뒤로 버튼 + 상태 두 줄 ----
+            Row(
                 Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.94f),
-                ),
-                elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
+                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Column(Modifier.padding(14.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Column(Modifier.weight(1f)) {
-                            Text(
-                                "DAY ${dayPlan.day} · ${legIndex + 1}/${geoms.size} 구간",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                            Text(
-                                "???까지 " +
-                                    formatDistance(remainMeters) +
-                                    " · 약 ${remainMinutes}분",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                            )
-                        }
-                        IconButton(onClick = { state.screen = Screen.Result }) {
-                            Icon(painterResource(R.drawable.ic_close_md), contentDescription = "나가기")
-                        }
-                    }
-                    if (currentLeg.mode == "TRANSIT") {
-                        Spacer(Modifier.height(8.dp))
-                        Column(
-                            Modifier
-                                .fillMaxWidth()
-                                .background(
-                                    MaterialTheme.colorScheme.secondaryContainer,
-                                    RoundedCornerShape(12.dp),
-                                )
-                                .padding(10.dp),
-                        ) {
-                            Text(
-                                (currentLeg.summary
-                                    ?: "${currentLeg.boardStop ?: "정류장"} 승차 → ${currentLeg.alightStop ?: "정류장"} 하차"),
-                                style = MaterialTheme.typography.bodySmall,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onSecondaryContainer,
-                            )
-                            currentLeg.steps?.takeIf { it.isNotEmpty() }?.let { steps ->
-                                Spacer(Modifier.height(4.dp))
-                                Text(
-                                    steps.joinToString("  →  ") { it.description ?: "" },
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSecondaryContainer
-                                        .copy(alpha = 0.8f),
-                                )
-                            }
-                        }
-                    }
+                MapBackButton { state.screen = Screen.Result }
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        "Day ${dayPlan.day} 여정",
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = webText(),
+                    )
+                    Spacer(Modifier.height(2.dp))
+                    Text(
+                        "다음 비밀 장소까지 ${formatDistance(remainMeters)} · 약 ${remainMinutes}분",
+                        fontSize = 12.sp,
+                        color = webTextMuted(),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                 }
+            }
+
+            // ---- 웹 `.progress-pill` ----
+            MapPill(
+                "비밀 장소 $revealedCount / ${geoms.size}",
+                Modifier.align(Alignment.CenterHorizontally),
+            )
+
+            if (currentLeg.mode == "TRANSIT") {
+                Spacer(Modifier.height(8.dp))
+                MapPill(
+                    currentLeg.summary
+                        ?: "${currentLeg.boardStop ?: "정류장"} 승차 → ${currentLeg.alightStop ?: "정류장"} 하차",
+                    Modifier
+                        .align(Alignment.CenterHorizontally)
+                        .padding(horizontal = 16.dp),
+                    color = WebOrangeDark,
+                )
             }
 
             Spacer(Modifier.weight(1f))
 
-            // ---- 하단 컨트롤 ----
-            Card(
+            // ---- 웹 `.mystery-hint` — 지도 위에 뜨는 안내 ----
+            MysteryHint(
+                if (playing) "보라색 길을 따라가는 중" else "시뮬레이션을 눌러 길을 따라가세요",
+                Modifier.padding(horizontal = 16.dp),
+            )
+
+            // ---- 웹 `.map-bottombar` + `.sim-btn` ----
+            Row(
                 Modifier
                     .fillMaxWidth()
-                    .padding(16.dp),
-                shape = RoundedCornerShape(24.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.94f),
-                ),
-                elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
+                    .padding(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 26.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Row(
-                    Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Button(
-                        onClick = { playing = !playing },
-                        enabled = revealStop == null && !completed,
-                        shape = RoundedCornerShape(14.dp),
-                    ) {
-                        Text(
-                            if (playing) "일시정지" else "시뮬레이션",
-                            fontWeight = FontWeight.Bold,
-                        )
-                    }
-                    Spacer(Modifier.width(10.dp))
-                    SPEED_OPTIONS.forEachIndexed { i, (_, label) ->
-                        FilterChip(
-                            selected = speedIdx == i,
-                            onClick = { speedIdx = i },
-                            label = { Text(label) },
-                            modifier = Modifier.padding(end = 6.dp),
-                        )
-                    }
+                SimButton(
+                    text = if (playing) "일시정지" else "시뮬레이션",
+                    primary = true,
+                    enabled = revealStop == null && !completed,
+                    modifier = Modifier.weight(1f),
+                ) { playing = !playing }
+                SPEED_OPTIONS.forEachIndexed { i, (_, label) ->
+                    SimButton(label, primary = false, selected = speedIdx == i) { speedIdx = i }
                 }
             }
         }
@@ -446,14 +415,137 @@ private fun JourneyMap(
 }
 
 // ---------------------------------------------------------------------------
-// 도착 리빌 오버레이 (컨페티 + 카드)
+// 지도 화면 조각 (웹 `.map-back` / `.progress-pill` / `.mystery-hint` / `.sim-btn`)
+// ---------------------------------------------------------------------------
+
+/** 웹 `.map-back` — 40dp 흰 사각 버튼 */
+@Composable
+private fun MapBackButton(onClick: () -> Unit) {
+    Surface(
+        onClick = onClick,
+        modifier = Modifier.size(40.dp),
+        shape = RoundedCornerShape(12.dp),
+        color = webSurface(),
+        border = BorderStroke(1.dp, webBorderStrong()),
+        shadowElevation = 2.dp,
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Icon(
+                painterResource(R.drawable.ic_chevron_left),
+                contentDescription = "뒤로",
+                tint = WebMintDeep,
+                modifier = Modifier.size(20.dp),
+            )
+        }
+    }
+}
+
+/** 웹 `.progress-pill` — 지도 위에 떠 있는 흰 알약 */
+@Composable
+private fun MapPill(text: String, modifier: Modifier = Modifier, color: Color = WebMintDeep) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(50),
+        color = webSurface(),
+        border = BorderStroke(1.dp, webBorderStrong()),
+        shadowElevation = 2.dp,
+    ) {
+        Text(
+            text,
+            modifier = Modifier.padding(horizontal = 18.dp, vertical = 8.dp),
+            fontSize = 12.5.sp,
+            fontWeight = FontWeight.Bold,
+            color = color,
+            textAlign = TextAlign.Center,
+        )
+    }
+}
+
+/** 웹 `.mystery-hint` — 지도 하단의 반투명 안내 상자 */
+@Composable
+private fun MysteryHint(text: String, modifier: Modifier = Modifier) {
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        color = webSurface().copy(alpha = 0.96f),
+        border = BorderStroke(1.dp, webBorderStrong()),
+        shadowElevation = 4.dp,
+    ) {
+        Text(
+            text,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 13.dp),
+            fontSize = 13.sp,
+            lineHeight = 20.sp,
+            color = webTextLabel(),
+        )
+    }
+}
+
+/** 웹 `.sim-btn` / `.sim-btn.primary` */
+@Composable
+private fun SimButton(
+    text: String,
+    primary: Boolean,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    selected: Boolean = false,
+    onClick: () -> Unit,
+) {
+    Surface(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = modifier,
+        shape = RoundedCornerShape(12.dp),
+        color = when {
+            primary && enabled -> Color.Transparent
+            selected -> webChipOnFill()
+            else -> webSurface()
+        },
+        border = if (primary) null else BorderStroke(
+            1.5.dp,
+            if (selected) webChipOnBorder() else webBorderStrong(),
+        ),
+    ) {
+        Box(
+            Modifier
+                .thenIf(primary) {
+                    Modifier.background(
+                        if (enabled) {
+                            Brush.linearGradient(listOf(WebMint, WebMintDeep))
+                        } else {
+                            Brush.linearGradient(listOf(webFill(), webFill()))
+                        },
+                        RoundedCornerShape(12.dp),
+                    )
+                }
+                .padding(horizontal = 14.dp, vertical = 14.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+                color = when {
+                    primary && enabled -> Color.White
+                    primary -> webTextDim()
+                    selected -> webChipOnText()
+                    else -> webTextChip()
+                },
+            )
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// 도착 리빌 오버레이 (컨페티 + 카드) — 웹 `.reveal-overlay` / `.reveal-card`
 // ---------------------------------------------------------------------------
 @Composable
 private fun RevealOverlay(stop: StopDto, isLast: Boolean, onContinue: () -> Unit) {
     Box(
         Modifier
             .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.55f)),
+            .background(Color(0xFF262D2E).copy(alpha = 0.55f))
+            .padding(26.dp),
         contentAlignment = Alignment.Center,
     ) {
         ConfettiCanvas(key = stop)
@@ -461,82 +553,89 @@ private fun RevealOverlay(stop: StopDto, isLast: Boolean, onContinue: () -> Unit
             visible = true,
             enter = scaleIn(initialScale = 0.7f) + fadeIn(),
         ) {
-            Card(
-                Modifier
-                    .fillMaxWidth()
-                    .padding(28.dp),
-                shape = RoundedCornerShape(28.dp),
-                elevation = CardDefaults.cardElevation(defaultElevation = 12.dp),
+            Surface(
+                Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(20.dp),
+                color = webSurface(),
+                border = BorderStroke(1.dp, webBorder()),
+                shadowElevation = 16.dp,
             ) {
                 Column(
-                    Modifier.padding(24.dp),
+                    Modifier
+                        .padding(horizontal = 24.dp, vertical = 30.dp)
+                        .verticalScroll(rememberScrollState()),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
+                    // 웹 `.reveal-card .emoji { font-size: 52px }` — 이모지만 토스페이스로
                     Text(
-                        "장소 공개",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.Bold,
+                        stopEmoji(stop.type),
+                        fontSize = 52.sp,
+                        lineHeight = 60.sp,
+                        fontFamily = TossFaceFontFamily,
                     )
                     Spacer(Modifier.height(12.dp))
                     Text(
-                        stopEmoji(stop.type),
-                        fontSize = 54.sp,
-                        fontFamily = TossFaceFontFamily, // 이모지만 토스페이스로
+                        if (isLast) "오늘의 여정 완료! 마지막 장소는…" else "도착! 이곳은…",
+                        fontSize = 12.sp,
+                        letterSpacing = 3.sp,
+                        color = webTextFaint(),
+                        textAlign = TextAlign.Center,
                     )
                     Spacer(Modifier.height(8.dp))
                     Text(
                         stop.name ?: "미스터리 장소",
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Black,
+                        fontSize = 24.sp,
+                        lineHeight = 32.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = webText(),
                         textAlign = TextAlign.Center,
                     )
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        stopTypeLabel(stop.type) +
-                            (if (stop.rating > 0) "  ·  ★ %.1f".format(stop.rating) else ""),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    if (stop.cost > 0) {
-                        Spacer(Modifier.height(6.dp))
+                    stop.address?.takeIf { it.isNotBlank() }?.let {
+                        Spacer(Modifier.height(8.dp))
+                        Text(it, fontSize = 13.sp, color = webTextMuted(), textAlign = TextAlign.Center)
+                    }
+                    stop.description?.takeIf { it.isNotBlank() }?.let {
+                        Spacer(Modifier.height(12.dp))
                         Text(
-                            won(stop.cost),
-                            style = MaterialTheme.typography.titleMedium,
+                            it,
+                            fontSize = 13.5.sp,
+                            lineHeight = 22.sp,
+                            color = webTextLabel(),
+                            textAlign = TextAlign.Center,
+                        )
+                    }
+                    // 웹 `.reveal-card .meta` — 가운데 정렬 민트 굵은 글씨
+                    Spacer(Modifier.height(16.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
+                        Text(
+                            stopTypeLabel(stop.type),
+                            fontSize = 14.sp,
                             fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.tertiary,
+                            color = WebMint,
                         )
+                        if (stop.rating > 0) {
+                            Text(
+                                "★ %.1f".format(stop.rating),
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = WebMint,
+                            )
+                        }
+                        if (stop.cost > 0) {
+                            Text(
+                                won(stop.cost),
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = WebMint,
+                            )
+                        }
                     }
-                    stop.address?.let {
-                        Spacer(Modifier.height(6.dp))
-                        Text(
-                            it,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            textAlign = TextAlign.Center,
-                        )
-                    }
-                    stop.description?.let {
-                        Spacer(Modifier.height(10.dp))
-                        HorizontalDivider()
-                        Spacer(Modifier.height(10.dp))
-                        Text(
-                            it,
-                            style = MaterialTheme.typography.bodyMedium,
-                            textAlign = TextAlign.Center,
-                        )
-                    }
-                    Spacer(Modifier.height(20.dp))
-                    Button(
+                    Spacer(Modifier.height(22.dp))
+                    PrimaryCta(
+                        text = if (isLast) "여정 마치기" else "다음 비밀 장소로 →",
                         onClick = onContinue,
-                        modifier = Modifier.fillMaxWidth().height(50.dp),
-                        shape = RoundedCornerShape(16.dp),
-                    ) {
-                        Text(
-                            if (isLast) "여행 요약" else "다음",
-                            fontWeight = FontWeight.Bold,
-                        )
-                    }
+                        modifier = Modifier.fillMaxWidth(),
+                    )
                 }
             }
         }
@@ -606,71 +705,78 @@ private fun CompletionOverlay(state: AppState, dayIndex: Int) {
     Box(
         Modifier
             .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.55f)),
+            .background(Color(0xFF262D2E).copy(alpha = 0.55f))
+            .padding(26.dp),
         contentAlignment = Alignment.Center,
     ) {
         ConfettiCanvas(key = "done-$dayIndex")
-        Card(
-            Modifier
-                .fillMaxWidth()
-                .padding(28.dp),
-            shape = RoundedCornerShape(28.dp),
-            elevation = CardDefaults.cardElevation(defaultElevation = 12.dp),
+        Surface(
+            Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            color = webSurface(),
+            border = BorderStroke(1.dp, webBorder()),
+            shadowElevation = 16.dp,
         ) {
             Column(
                 Modifier
-                    .padding(24.dp)
+                    .padding(horizontal = 24.dp, vertical = 30.dp)
                     .verticalScroll(rememberScrollState()),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Text(
-                    if (hasNextDay) "DAY ${dayPlan.day} 완료" else "여행 완료",
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Black,
+                    if (hasNextDay) "Day ${dayPlan.day} 완료" else "여행 완료",
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = webText(),
                 )
-                Spacer(Modifier.height(4.dp))
+                Spacer(Modifier.height(8.dp))
                 Text(
-                    "오늘 쓴 돈 ${won(dayPlan.dayCost)}",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    "오늘 쓴 비용 ${won(dayPlan.dayCost)}",
+                    fontSize = 13.sp,
+                    color = webTextMuted(),
                 )
                 Spacer(Modifier.height(14.dp))
-                HorizontalDivider()
-                Spacer(Modifier.height(10.dp))
+                DashedDivider()
+                Spacer(Modifier.height(6.dp))
                 dayPlan.stops.forEach { stop ->
                     Row(
                         Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 4.dp),
+                            .padding(vertical = 6.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text(
                             stop.name ?: "???",
-                            style = MaterialTheme.typography.bodyMedium,
+                            fontSize = 13.5.sp,
                             fontWeight = FontWeight.SemiBold,
+                            color = webTextLabel(),
                             modifier = Modifier.weight(1f),
                         )
                         if (stop.cost > 0) {
                             Text(
                                 won(stop.cost),
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.tertiary,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = WebMint,
                             )
                         }
                     }
                 }
                 if (!hasNextDay) {
-                    Spacer(Modifier.height(10.dp))
-                    HorizontalDivider()
-                    Spacer(Modifier.height(10.dp))
+                    Spacer(Modifier.height(6.dp))
+                    DashedDivider()
+                    Spacer(Modifier.height(12.dp))
                     Text(
-                        "총 비용 ${won(plan.totalCost)} · 남은 예산 ${won(plan.remainingBudget)}",
-                        style = MaterialTheme.typography.bodyMedium,
+                        "총 비용 ${won(plan.totalCost)} · 남는 예산 ${won(plan.remainingBudget)}",
+                        fontSize = 13.5.sp,
                         fontWeight = FontWeight.Bold,
+                        color = webText(),
+                        textAlign = TextAlign.Center,
                     )
                 }
-                Spacer(Modifier.height(20.dp))
-                Button(
+                Spacer(Modifier.height(22.dp))
+                PrimaryCta(
+                    text = if (hasNextDay) "Day ${dayPlan.day + 1} 시작" else "플랜으로 돌아가기",
                     onClick = {
                         state.screen = if (hasNextDay) {
                             Screen.Journey(dayIndex + 1)
@@ -678,14 +784,8 @@ private fun CompletionOverlay(state: AppState, dayIndex: Int) {
                             Screen.Result
                         }
                     },
-                    modifier = Modifier.fillMaxWidth().height(50.dp),
-                    shape = RoundedCornerShape(16.dp),
-                ) {
-                    Text(
-                        if (hasNextDay) "DAY ${dayPlan.day + 1} 시작" else "플랜으로 돌아가기",
-                        fontWeight = FontWeight.Bold,
-                    )
-                }
+                    modifier = Modifier.fillMaxWidth(),
+                )
             }
         }
     }

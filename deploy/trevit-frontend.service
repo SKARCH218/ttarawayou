@@ -1,0 +1,24 @@
+# 트레빗 프론트 (node2 / 10.8.1.102) — 정적 웹을 3000 포트로 서빙
+# setup-node2.sh 가 자동으로 설치합니다.
+
+[Unit]
+Description=Trevit frontend (Express static)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=trevit
+WorkingDirectory=/opt/trevit/frontend
+Environment=PORT=3000
+ExecStart=/usr/bin/node /opt/trevit/frontend/server.js
+
+Restart=always
+RestartSec=10
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=trevit-web
+
+[Install]
+WantedBy=multi-user.target
