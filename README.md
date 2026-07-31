@@ -11,7 +11,9 @@
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
-**프로덕트 URL: [배포 후 기입] · 데모 모드 지원 (GPS 불필요) · 서비스 지역: 수도권(서울·경기·인천)**
+### 🔗 프로덕트 URL — http://112.166.208.166
+
+데모 모드 지원 (GPS 불필요) · 서비스 지역: 수도권(서울·경기·인천)
 
 </div>
 
