@@ -183,12 +183,18 @@ class AiPlanService(
                 mapOf("role" to "user", "content" to userPrompt),
             ),
         )
+        // 응답을 바이트로 받아 직접 문자열로 바꾼다.
+        // LM Studio 는 버전·설정에 따라 Content-Type 을 application/octet-stream 으로 주기도 하는데,
+        // String 으로 바로 받으면 컨버터를 못 찾아 "Error while extracting response" 로 실패한다.
         val res = http.post()
             .uri(URI.create("$baseUrl/chat/completions"))
             .contentType(MediaType.APPLICATION_JSON)
+            .accept(MediaType.APPLICATION_JSON)
             .body(mapper.writeValueAsString(body))
             .retrieve()
-            .body(String::class.java)
+            .body(ByteArray::class.java)
+            ?.toString(Charsets.UTF_8)
+            ?: return ""
         val root = mapper.readTree(res)
         return root.path("choices").path(0).path("message").path("content").asText("")
     }
