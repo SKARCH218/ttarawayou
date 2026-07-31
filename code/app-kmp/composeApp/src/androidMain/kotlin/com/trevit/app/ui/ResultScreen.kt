@@ -1,292 +1,175 @@
 package com.trevit.app.ui
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AssistChip
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.trevit.app.AppState
-import com.trevit.app.DURATIONS
 import com.trevit.app.R
 import com.trevit.app.Screen
-import com.trevit.app.map.stopTypeLabel
 import com.trevit.app.won
 import com.trevit.shared.DayPlanDto
-import kotlin.math.min
 
-@OptIn(ExperimentalMaterial3Api::class)
+/**
+ * 플랜 결과 — 웹 `plan.html` 을 그대로 옮긴 화면.
+ * 심볼 → "플랜 완성" → 부제·설계 주체 → (AI 한마디) → 비용 카드 → 예산 배분 바 → Day 버튼 → 처음부터.
+ *
+ * 웹과 마찬가지로 장소 이름은 여기서 절대 보여주지 않는다 — 도착해야 공개된다.
+ */
 @Composable
 fun ResultScreen(state: AppState) {
     val plan = state.plan ?: run {
-        state.screen = Screen.Home
+        state.screen = Screen.Setup
         return
     }
-    var selectedDay by remember { mutableIntStateOf(0) }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    GradientTitle(
-                        state.region?.let { "$it 여행" } ?: "여행 플랜",
-                        style = MaterialTheme.typography.headlineSmall,
-                        textAlign = TextAlign.Start,
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = { state.screen = Screen.Home }) {
-                        Icon(painterResource(R.drawable.ic_chevron_left), contentDescription = "뒤로")
-                    }
-                },
-                actions = {
-                    AssistChip(
-                        onClick = {},
-                        label = {
-                            Text(
-                                when (plan.plannedBy) {
-                                    "AI" -> "AI"
-                                    "DEMO" -> "데모"
-                                    else -> "자동"
-                                },
-                            )
-                        },
-                    )
-                    Spacer(Modifier.width(8.dp))
-                },
-            )
-        },
-        bottomBar = {
-            val allDone = state.completedDays >= plan.dayPlans.size
-            val nextDay = min(state.completedDays, plan.dayPlans.size - 1)
-            PrimaryCta(
-                text = when {
-                    allDone -> "여행 완료"
-                    state.completedDays == 0 -> "여행 시작"
-                    else -> "DAY ${state.completedDays + 1} 시작"
-                },
-                onClick = { if (!allDone) state.screen = Screen.Journey(nextDay) },
-                enabled = !allDone,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-            )
-        },
-    ) { padding ->
-        Column(
-            Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            plan.aiReason?.takeIf { it.isNotBlank() }?.let { reason ->
-                TrevitCard(Modifier.fillMaxWidth()) {
-                    Column(Modifier.padding(16.dp)) {
-                        Text(
-                            "AI 추천 이유",
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = WebMintDeep,
-                        )
-                        Spacer(Modifier.height(6.dp))
-                        Text(reason, style = MaterialTheme.typography.bodyMedium)
-                    }
-                }
-            }
+    WebScreen {
+        // 웹 `.brand-logo` (plan.html 은 심볼만 76px) — 원본 비율 94:58
+        Icon(
+            painter = painterResource(R.drawable.ic_travit_symbol),
+            contentDescription = null,
+            tint = BrandMint,
+            modifier = Modifier
+                .width(76.dp)
+                .height(47.dp),
+        )
+        Spacer(Modifier.height(6.dp))
+        GradientTitle("플랜 완성")
+        Spacer(Modifier.height(10.dp))
+        WebSubtitle("장소는 도착할 때 공개돼요")
+        Spacer(Modifier.height(6.dp))
+        WebSubtitle(
+            if (plan.plannedBy == "AI") "AI가 설계한 플랜" else "알고리즘이 설계한 플랜",
+            color = webTextFaint(),
+            fontSize = 12.sp,
+        )
 
+        // 웹: AI 추천 이유가 있으면 비용 카드 앞에 카드 하나를 더 끼운다
+        plan.aiReason?.takeIf { it.isNotBlank() }?.let { reason ->
+            Spacer(Modifier.height(16.dp))
             TrevitCard(Modifier.fillMaxWidth()) {
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                ) {
-                    SummaryItem("예산", won(plan.budget))
-                    SummaryItem("총비용", won(plan.totalCost))
-                    SummaryItem("잔여", won(plan.remainingBudget), accent = true)
-                }
+                Text("AI의 한마디", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = webTextChip())
+                Spacer(Modifier.height(4.dp))
+                Text(reason, fontSize = 13.sp, lineHeight = 21.sp, color = webTextChip())
             }
-
-            SectionLabel("예산 배분")
-            val b = plan.breakdown
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                BudgetCell("숙박", b.lodgingSpent, b.lodgingBudget, Modifier.weight(1f))
-                BudgetCell("관광", b.attractionSpent, b.attractionBudget, Modifier.weight(1f))
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                BudgetCell("식비", b.foodSpent, b.foodBudget, Modifier.weight(1f))
-                BudgetCell("교통", b.transportSpent, b.transportBudget, Modifier.weight(1f))
-            }
-
-            SectionLabel("일정 · ${DURATIONS.getOrElse(plan.days - 1) { "${plan.days}일" }}")
-            if (plan.dayPlans.size > 1) {
-                TabRow(selectedTabIndex = selectedDay) {
-                    plan.dayPlans.forEachIndexed { i, dp ->
-                        Tab(
-                            selected = selectedDay == i,
-                            onClick = { selectedDay = i },
-                            text = { Text(if (i < state.completedDays) "DAY ${dp.day} ✓" else "DAY ${dp.day}") },
-                        )
-                    }
-                }
-            }
-            plan.dayPlans.getOrNull(selectedDay)?.let { dayPlan ->
-                DayTimeline(dayPlan, revealed = selectedDay < state.completedDays)
-            }
-            Spacer(Modifier.height(8.dp))
         }
-    }
-}
 
-@Composable
-private fun SummaryItem(label: String, value: String, accent: Boolean = false) {
-    Column {
-        Text(
-            label,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Text(
-            value,
-            style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.Bold,
-            color = if (accent) WebMintDeep else MaterialTheme.colorScheme.onSurface,
-        )
+        // ---- 비용 요약 (웹 `.cost-row` 4줄) ----
+        Spacer(Modifier.height(16.dp))
+        TrevitCard(Modifier.fillMaxWidth()) {
+            CostRow("총 예산", won(plan.budget), webText())
+            DashedDivider()
+            CostRow("예상 총비용", won(plan.totalCost), WebPurple, valueSize = 23.sp)
+            DashedDivider()
+            CostRow("남는 예산", won(plan.remainingBudget), WebMint)
+            DashedDivider()
+            CostRow("남은 토큰", "%,d 토큰".format(plan.tokenBalance), WebOrange)
+        }
+
+        // ---- 예산 배분 사용률 (웹 `.bar-group`) ----
+        Spacer(Modifier.height(16.dp))
+        TrevitCard(Modifier.fillMaxWidth()) {
+            Text("예산 배분 사용률", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = webTextLabel())
+            val b = plan.breakdown
+            // 웹 팔레트: 숙박=퍼플 · 관광=민트 · 식비=오렌지 · 교통=블루
+            BudgetBarRow("숙박", b.lodgingSpent, b.lodgingBudget, WebPurple)
+            BudgetBarRow("관광", b.attractionSpent, b.attractionBudget, WebMint)
+            BudgetBarRow("식비", b.foodSpent, b.foodBudget, WebOrange)
+            BudgetBarRow("교통", b.transportSpent, b.transportBudget, WebBlue)
+        }
+
+        // ---- Day 버튼 (웹 `.day-list`) ----
+        Spacer(Modifier.height(18.dp))
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            plan.dayPlans.forEachIndexed { index, day ->
+                DayEntry(state, day, index)
+            }
+        }
+
+        Spacer(Modifier.height(18.dp))
+        GhostButton("← 처음부터 다시", { state.resetPlan() }, Modifier.fillMaxWidth())
     }
 }
 
 /**
- * 예산 배분 한 칸. 숫자만 있으면 단조로워서, 웹 `.bar-fill` 처럼
- * 예산 대비 사용 비율을 가는 막대로 함께 보여준다.
+ * 웹 `.day-btn` 한 줄. 이전 일차를 마쳐야 다음 일차가 열린다.
+ * 장소 이름 대신 개수·소요·비용만 노출한다.
  */
 @Composable
-private fun BudgetCell(label: String, spent: Long, budget: Long, modifier: Modifier = Modifier) {
-    val over = budget > 0 && spent > budget
-    val fraction = if (budget > 0) spent.toFloat() / budget else 0f
-    TrevitCard(modifier, shape = RoundedCornerShape(16.dp)) {
-        Column(Modifier.padding(14.dp)) {
-            Text(
-                label,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(Modifier.height(4.dp))
-            Text(won(spent), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-            Spacer(Modifier.height(8.dp))
-            BudgetBar(fraction, overBudget = over)
-            Spacer(Modifier.height(6.dp))
-            Text(
-                "예산 ${won(budget)}",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
+private fun DayEntry(state: AppState, day: DayPlanDto, index: Int) {
+    val completed = index < state.completedDays
+    val locked = index > state.completedDays
+    val mysterySpots = day.stops.filterIndexed { i, s ->
+        i > 0 && !(i == day.stops.lastIndex && s.type == "LODGING")
+    }.size
+    val totalMinutes = day.legs.sumOf { it.durationMinutes }
+    val startAt = day.legs.firstOrNull()?.departAt ?: "09:00"
+
+    DayButton(
+        badge = when {
+            locked -> "잠김"
+            completed -> "완료"
+            else -> "D${day.day}"
+        },
+        title = "Day ${day.day} 여정 ${if (completed) "(완료)" else "따라가기"}",
+        info = when {
+            completed -> "완료한 여정 · 다시 보기"
+            locked -> "Day ${day.day - 1} 완료 후 열려요 · $startAt 시작 예정"
+            else -> "$startAt 시작 · 비밀 장소 ${mysterySpots}곳 · 이동 약 ${totalMinutes}분 · ${won(day.dayCost)}"
+        },
+        locked = locked,
+        onClick = { state.screen = Screen.Journey(index) },
+    )
 }
 
+/** 웹 `.bar-item` — 라벨/사용액 한 줄 + 8dp 바. 웹처럼 0에서 목표까지 차오른다. */
 @Composable
-private fun DayTimeline(dayPlan: DayPlanDto, revealed: Boolean) {
-    TrevitCard(Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(16.dp)) {
-            dayPlan.stops.forEachIndexed { i, stop ->
-                val isStart = stop.type == "START" || i == 0
-                val show = revealed || isStart
-                val arriveAt = dayPlan.legs.getOrNull(i - 1)?.arriveAt
+private fun BudgetBarRow(label: String, spent: Long, budget: Long, color: Color) {
+    val target = if (budget > 0) (spent.toFloat() / budget).coerceIn(0f, 1f) else 0f
+    var started by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { started = true }
+    val fraction by animateFloatAsState(
+        targetValue = if (started) target else 0f,
+        animationSpec = tween(800),
+        label = "barFill",
+    )
 
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        painterResource(if (show) R.drawable.ic_map_pin else R.drawable.ic_lock),
-                        contentDescription = null,
-                        modifier = Modifier.size(20.dp),
-                        tint = if (show) MaterialTheme.colorScheme.primary
-                        else MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Spacer(Modifier.width(12.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text(
-                            if (show) (stop.name ?: "???") else "??? · ${stopTypeLabel(stop.type)}",
-                            style = MaterialTheme.typography.bodyLarge,
-                            fontWeight = FontWeight.Medium,
-                        )
-                        arriveAt?.let {
-                            Text(
-                                "$it 도착",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
-                    if (stop.cost > 0) {
-                        Text(
-                            won(stop.cost),
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.primary,
-                        )
-                    }
-                }
-
-                dayPlan.legs.getOrNull(i)?.let { leg ->
-                    Text(
-                        buildString {
-                            append(if (leg.mode == "TRANSIT") "버스 " else "도보 ")
-                            append("${leg.durationMinutes}분 · ${formatDistance(leg.distanceMeters)}")
-                            if (leg.fare > 0) append(" · ${won(leg.fare)}")
-                        },
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(start = 32.dp, top = 6.dp, bottom = 6.dp),
-                    )
-                }
-            }
-            HorizontalDivider(Modifier.padding(vertical = 8.dp))
-            Row(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                Text(
-                    "DAY ${dayPlan.day}",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Text(
-                    won(dayPlan.dayCost),
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.SemiBold,
-                )
-            }
-        }
+    Spacer(Modifier.height(12.dp))
+    Row(
+        Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(label, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = webTextMuted())
+        Text(
+            "${won(spent)} / ${won(budget)}",
+            fontSize = 12.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = webTextMuted(),
+        )
     }
+    Spacer(Modifier.height(6.dp))
+    BudgetBar(fraction, color)
 }
 
 fun formatDistance(meters: Double): String =

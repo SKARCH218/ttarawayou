@@ -81,7 +81,7 @@ private val SPEED_OPTIONS = listOf(1f to "1×", 3f to "3×", 10f to "10×")
 
 @Composable
 fun JourneyScreen(state: AppState, dayIndex: Int) {
-    val plan = state.plan ?: run { state.screen = Screen.Home; return }
+    val plan = state.plan ?: run { state.screen = Screen.Setup; return }
     val dayPlan = plan.dayPlans.getOrNull(dayIndex) ?: run { state.screen = Screen.Result; return }
     val stops = dayPlan.stops
     val geoms = remember(dayIndex) {

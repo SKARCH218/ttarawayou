@@ -26,6 +26,10 @@ data class PlanRequest(
     val startLongitude: Double? = null,
 )
 
+/** GET /api/wallet · POST /api/wallet/reset 응답 */
+@Serializable
+data class WalletDto(val balance: Long = 0)
+
 /** 예산 배분 내역 */
 @Serializable
 data class BudgetBreakdown(

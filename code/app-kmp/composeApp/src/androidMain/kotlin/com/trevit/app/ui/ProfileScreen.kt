@@ -7,6 +7,10 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,25 +24,12 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -47,10 +38,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import com.trevit.app.AGE_GROUPS
 import com.trevit.app.AppState
@@ -59,19 +53,16 @@ import com.trevit.app.GENDER_OPTIONS
 import com.trevit.app.KEYWORD_OPTIONS
 import com.trevit.app.PURPOSES
 import com.trevit.app.ProfileQuestion
-import com.trevit.app.R
-import com.trevit.app.Screen
 import com.trevit.app.WALKING_OPTIONS
 import kotlinx.coroutines.delay
 
-/** 선택 후 다음 질문으로 넘어가기 전, 칩이 선택된 걸 눈으로 확인할 만큼의 여유 */
-private const val AUTO_ADVANCE_DELAY_MS = 240L
+/** 웹 `setTimeout(next, 180)` — 고른 걸 눈으로 확인할 만큼의 여유 */
+private const val AUTO_ADVANCE_DELAY_MS = 180L
 
 /**
- * 프로필 설문. 한 화면에 질문 하나씩 보여주고 좌우 슬라이드로 전환한다.
- * 레이아웃: 상단 진행 표시 → 중앙 이모지 → 질문 → 선택지 → 하단 뒤로/다음.
+ * 취향 질문 — 웹 `ask.html` + `.ask-*` 규칙을 그대로 옮긴 화면.
+ * 상단 8칸 진행 바 + "n / 8" → 가운데 이모지·질문·선택지 → 하단 [이전]·[다음] + 건너뛰기.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileScreen(state: AppState) {
     // 선택 → 짧은 딜레이 → 자동 다음. 토큰을 증가시켜 매번 다시 트리거한다.
@@ -83,12 +74,27 @@ fun ProfileScreen(state: AppState) {
     }
     val autoAdvance = { advanceToken++ }
 
-    Scaffold(
-        // 키보드가 올라오면 화면 전체를 밀어 올린다(하단 버튼이 가려지지 않도록)
-        modifier = Modifier.imePadding(),
-        topBar = { QuestionProgressBar(state) },
-        bottomBar = { QuestionNavBar(state) },
-    ) { padding ->
+    Column(
+        Modifier
+            .fillMaxSize()
+            .background(webBg())
+            .statusBarsPadding()
+            .imePadding()
+            // 웹 `.ask-screen { padding: 20px+safe 22px 28px }`
+            .padding(start = 22.dp, end = 22.dp, top = 20.dp, bottom = 28.dp),
+    ) {
+        SegmentedProgress(state.questionCount, state.questionIndex)
+        Spacer(Modifier.height(8.dp))
+        // 웹 `.ask-count` — 12px semibold mono-400, 오른쪽 정렬
+        Text(
+            "${state.questionIndex + 1} / ${state.questionCount}",
+            modifier = Modifier.fillMaxWidth(),
+            fontSize = 12.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = webTextDim(),
+            textAlign = TextAlign.End,
+        )
+
         AnimatedContent(
             targetState = state.questionIndex,
             transitionSpec = {
@@ -99,8 +105,8 @@ fun ProfileScreen(state: AppState) {
                     (slideOutHorizontally(tween(320), exitOffset) + fadeOut(tween(220)))
             },
             modifier = Modifier
-                .fillMaxSize()
-                .padding(padding),
+                .weight(1f)
+                .fillMaxWidth(),
             label = "question",
         ) { index ->
             val question = ProfileQuestion.ordered[index]
@@ -109,6 +115,7 @@ fun ProfileScreen(state: AppState) {
                     ProfileQuestion.Purpose -> SingleChoice(
                         options = PURPOSES,
                         selected = state.purpose,
+                        wide = question.wide,
                         onSelect = { state.purpose = it; autoAdvance() },
                     )
 
@@ -119,6 +126,7 @@ fun ProfileScreen(state: AppState) {
                             state.genderNotSpecified -> "선택 안 함"
                             else -> null
                         },
+                        wide = question.wide,
                         onSelect = { option ->
                             state.gender = option.takeIf { it != "선택 안 함" }
                             state.genderNotSpecified = option == "선택 안 함"
@@ -129,6 +137,7 @@ fun ProfileScreen(state: AppState) {
                     ProfileQuestion.AgeGroup -> SingleChoice(
                         options = AGE_GROUPS,
                         selected = state.ageGroup,
+                        wide = question.wide,
                         onSelect = { state.ageGroup = it; autoAdvance() },
                     )
 
@@ -137,6 +146,7 @@ fun ProfileScreen(state: AppState) {
                     ProfileQuestion.Food -> SingleChoice(
                         options = FOOD_PREFS,
                         selected = state.foodPreference,
+                        wide = question.wide,
                         onSelect = { state.foodPreference = it; autoAdvance() },
                     )
 
@@ -150,6 +160,7 @@ fun ProfileScreen(state: AppState) {
                         options = WALKING_OPTIONS,
                         selected = WALKING_OPTIONS[if (state.avoidWalking) 1 else 0]
                             .takeIf { state.walkingAnswered },
+                        wide = question.wide,
                         onSelect = { option ->
                             state.avoidWalking = option == WALKING_OPTIONS[1]
                             state.walkingAnswered = true
@@ -157,96 +168,72 @@ fun ProfileScreen(state: AppState) {
                         },
                     )
 
-                    ProfileQuestion.Note -> OutlinedTextField(
-                        value = state.preferenceNote,
-                        onValueChange = { state.preferenceNote = it },
-                        modifier = Modifier.fillMaxWidth(),
-                        placeholder = { Text("예: 매운 음식 좋아요, 조용한 카페 위주로") },
-                        shape = RoundedCornerShape(12.dp),
-                        minLines = 3,
-                    )
+                    ProfileQuestion.Note -> NoteField(state)
                 }
             }
         }
+
+        QuestionNav(state)
     }
 }
 
-/** 상단: 뒤로 화살표 + 진행 바 + "3 / 8" */
+/**
+ * 웹 `.ask-nav` + `.ask-skip`.
+ * 단일 선택 질문은 고르는 순간 넘어가므로 웹처럼 [다음]·건너뛰기를 감추고 [이전]만 남긴다.
+ */
 @Composable
-private fun QuestionProgressBar(state: AppState) {
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .statusBarsPadding()
-            .padding(start = 4.dp, end = 20.dp, top = 8.dp, bottom = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        IconButton(onClick = { state.previousQuestion() }) {
-            Icon(painterResource(R.drawable.ic_chevron_left), contentDescription = "뒤로")
-        }
-        LinearProgressIndicator(
-            progress = { (state.questionIndex + 1f) / state.questionCount },
-            // 색을 명시하지 않으면 트랙이 Material 기본 보라로 떠서 브랜드와 충돌한다
-            color = MaterialTheme.colorScheme.primary,
-            trackColor = MaterialTheme.colorScheme.surfaceVariant,
-            drawStopIndicator = {},
-            modifier = Modifier
-                .weight(1f)
-                .height(6.dp),
-        )
-        Spacer(Modifier.size(12.dp))
-        Text(
-            "${state.questionIndex + 1} / ${state.questionCount}",
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
-}
-
-/** 하단: 뒤로 / (다중 선택·서술형이면) 다음 · 건너뛰기 */
-@Composable
-private fun QuestionNavBar(state: AppState) {
+private fun QuestionNav(state: AppState) {
     val question = state.question
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .navigationBarsPadding()
-            .padding(horizontal = 12.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween,
-    ) {
-        TextButton(onClick = { state.previousQuestion() }) { Text("뒤로") }
+    val last = state.questionIndex == state.questionCount - 1
 
-        if (question.autoAdvance) {
-            // 단일 선택 질문은 고르는 순간 넘어가므로 건너뛰기만 둔다
-            TextButton(onClick = { state.nextQuestion() }) { Text("건너뛰기") }
-        } else {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                // 답을 지우고 넘어가는 명시적 건너뛰기 (MBTI는 화면 안에 "모름"이 있어 제외)
-                if (question != ProfileQuestion.Mbti) {
-                    TextButton(onClick = {
+    Column(Modifier.navigationBarsPadding()) {
+        Spacer(Modifier.height(14.dp))
+        Row(
+            Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            WebBackButton(
+                text = if (state.questionIndex == 0) "설정" else "이전",
+                onClick = { state.previousQuestion() },
+            )
+            if (!question.autoAdvance) {
+                PrimaryCta(
+                    text = if (last) "플랜 만들기" else "다음",
+                    onClick = { state.nextQuestion() },
+                    modifier = Modifier.weight(1f),
+                )
+            }
+        }
+        if (!question.autoAdvance) {
+            // 웹 `.ask-skip` — 밑줄 친 회색 글자, 가운데
+            val interaction = remember { MutableInteractionSource() }
+            Text(
+                "건너뛰기",
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(interactionSource = interaction, indication = null) {
                         when (question) {
                             ProfileQuestion.Places -> state.keywords.clear()
                             ProfileQuestion.Note -> state.preferenceNote = ""
                             else -> Unit
                         }
                         state.nextQuestion()
-                    }) { Text("건너뛰기") }
-                    Spacer(Modifier.size(8.dp))
-                }
-                PrimaryCta(
-                    text = if (state.questionIndex == state.questionCount - 1) "플랜 만들기" else "다음",
-                    onClick = { state.nextQuestion() },
-                    modifier = Modifier.width(160.dp),
-                )
-            }
+                    }
+                    .padding(10.dp),
+                fontSize = 13.5.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = webTextDim(),
+                textDecoration = TextDecoration.Underline,
+                textAlign = TextAlign.Center,
+            )
         }
     }
 }
 
 /**
- * 질문 한 페이지의 공통 골격. 이모지를 화면 중앙에 크게 두고 그 아래에 질문·선택지를 쌓는다.
- * 키보드가 올라오거나 선택지가 많으면 스크롤로 흘러가되, 짧으면 세로 중앙 정렬을 유지한다.
+ * 웹 `.ask-body` — 이모지를 화면 정가운데에 두고 질문·힌트·선택지를 그 아래에 쌓는다.
+ * 선택지가 길거나 키보드가 올라오면 스크롤되지만 짧으면 세로 중앙 정렬을 유지한다.
  */
 @Composable
 private fun QuestionPage(
@@ -256,129 +243,151 @@ private fun QuestionPage(
     Box(
         Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 24.dp, vertical = 16.dp),
+            .verticalScroll(rememberScrollState()),
         contentAlignment = Alignment.Center,
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            // 이모지 위아래 여백이 넓어 휑해 보이던 자리에 옅은 민트 후광을 깔아 시선을 모은다
-            EmojiHalo(size = 190.dp) {
-                Text(
-                    question.emoji,
-                    fontSize = 80.sp,
-                    lineHeight = 104.sp,
-                    fontFamily = TossFaceFontFamily, // 이모지만 토스페이스로
-                    textAlign = TextAlign.Center,
-                )
-            }
-            Spacer(Modifier.height(12.dp))
+        Column(
+            Modifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            // 웹 `.ask-emoji { font-size: 76px }` — 토스페이스는 이모지에만
             Text(
-                question.title,
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
+                question.emoji,
+                fontSize = 76.sp,
+                lineHeight = 76.sp,
+                fontFamily = TossFaceFontFamily,
                 textAlign = TextAlign.Center,
             )
-            Spacer(Modifier.height(32.dp))
+            Spacer(Modifier.height(20.dp))
+            // 웹 `.ask-question { 21px bold, line-height 1.45, tracking -0.02em }`
+            Text(
+                question.title,
+                fontSize = 21.sp,
+                lineHeight = 30.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = (-0.02f).em,
+                color = webText(),
+                textAlign = TextAlign.Center,
+            )
+            question.hint?.let {
+                Spacer(Modifier.height(10.dp))
+                // 웹 `.ask-hint { 13px, mono-500 }`
+                Text(it, fontSize = 13.sp, color = webTextFaint(), textAlign = TextAlign.Center)
+            }
+            Spacer(Modifier.height(24.dp))
             options()
         }
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+/** 웹 `.ask-options` — 알약 선택지를 가운데 정렬로 줄바꿈. [wide] 면 한 줄에 하나씩. */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun SingleChoice(
     options: List<String>,
     selected: String?,
+    wide: Boolean,
     onSelect: (String) -> Unit,
 ) {
-    FlowRow(
-        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        options.forEach { option ->
-            val isSelected = selected == option
-            FilterChip(
-                selected = isSelected,
-                onClick = { onSelect(option) },
-                label = { Text(option, style = MaterialTheme.typography.bodyLarge) },
-                shape = RoundedCornerShape(50),
-                colors = trevitChipColors(),
-                border = trevitChipBorder(isSelected),
-            )
+    if (wide) {
+        Column(
+            Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(9.dp),
+        ) {
+            options.forEach { option ->
+                WebChip(option, selected == option, { onSelect(option) }, Modifier.fillMaxWidth())
+            }
+        }
+    } else {
+        FlowRow(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(9.dp, Alignment.CenterHorizontally),
+            verticalArrangement = Arrangement.spacedBy(9.dp),
+        ) {
+            options.forEach { option ->
+                WebChip(option, selected == option, { onSelect(option) })
+            }
         }
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun MultiChoice(
     options: List<String>,
     selected: List<String>,
     onToggle: (String) -> Unit,
 ) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            options.forEach { option ->
-                val isSelected = option in selected
-                FilterChip(
-                    selected = isSelected,
-                    onClick = { onToggle(option) },
-                    label = { Text(option, style = MaterialTheme.typography.bodyLarge) },
-                    shape = RoundedCornerShape(50),
-                    colors = trevitChipColors(),
-                    border = trevitChipBorder(isSelected),
-                )
-            }
+    FlowRow(
+        Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(9.dp, Alignment.CenterHorizontally),
+        verticalArrangement = Arrangement.spacedBy(9.dp),
+    ) {
+        options.forEach { option ->
+            WebChip(option, option in selected, { onToggle(option) })
         }
-        Spacer(Modifier.height(12.dp))
-        Text(
-            "여러 개 고를 수 있어요",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
     }
 }
 
-/** MBTI만 예외적으로 4줄(축별 토글) + "모름" */
+/** 웹 `.ask-mbti` — 축마다 한 줄, 한 줄에 두 칸 */
 @Composable
 private fun MbtiChoice(state: AppState) {
     Column(
         Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(9.dp),
     ) {
         MbtiAxis('E' to 'I', state.mbtiEI) { state.mbtiEI = it }
         MbtiAxis('S' to 'N', state.mbtiSN) { state.mbtiSN = it }
         MbtiAxis('T' to 'F', state.mbtiTF) { state.mbtiTF = it }
         MbtiAxis('J' to 'P', state.mbtiJP) { state.mbtiJP = it }
-        TextButton(onClick = {
-            state.mbtiEI = null
-            state.mbtiSN = null
-            state.mbtiTF = null
-            state.mbtiJP = null
-            state.nextQuestion()
-        }) { Text("모름") }
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun MbtiAxis(
     options: Pair<Char, Char>,
     selected: Char?,
     onSelect: (Char?) -> Unit,
 ) {
-    SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-        listOf(options.first, options.second).forEachIndexed { i, c ->
-            SegmentedButton(
+    Row(
+        Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        listOf(options.first, options.second).forEach { c ->
+            WebChip(
+                text = c.toString(),
                 selected = selected == c,
                 onClick = { onSelect(if (selected == c) null else c) },
-                shape = SegmentedButtonDefaults.itemShape(index = i, count = 2),
-                colors = trevitSegmentedColors(),
-            ) { Text(c.toString(), style = MaterialTheme.typography.titleMedium) }
+                modifier = Modifier.weight(1f),
+            )
         }
+    }
+}
+
+/** 웹 `.ask-note` — 패딩 13/14, radius 12, 1.5px mono-100, mono-050 배경, 14.5px */
+@Composable
+private fun NoteField(state: AppState) {
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .border(1.5.dp, webBorderStrong(), RoundedCornerShape(12.dp))
+            .background(webFill(), RoundedCornerShape(12.dp))
+            .padding(horizontal = 14.dp, vertical = 13.dp),
+    ) {
+        if (state.preferenceNote.isEmpty()) {
+            Text(
+                "예: 매운 음식 좋아요, 조용한 카페 위주로",
+                fontSize = 14.5.sp,
+                color = webTextDim(),
+            )
+        }
+        BasicTextField(
+            value = state.preferenceNote,
+            onValueChange = { if (it.length <= 120) state.preferenceNote = it },
+            singleLine = true,
+            textStyle = TextStyle(fontSize = 14.5.sp, color = webText()),
+            cursorBrush = SolidColor(WebMint),
+            modifier = Modifier.fillMaxWidth(),
+        )
     }
 }

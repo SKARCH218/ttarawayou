@@ -4,6 +4,7 @@ import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.client.request.get
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
@@ -31,6 +32,14 @@ class PlanRepository(
         }
         return response.body()
     }
+
+    /** GET {baseUrl}/api/wallet — 보유 토큰 조회 (웹 설정 화면의 "보유 N 토큰"과 같은 값) */
+    suspend fun fetchWallet(baseUrl: String): Long =
+        client.get(baseUrl.trimEnd('/') + "/api/wallet").body<WalletDto>().balance
+
+    /** POST {baseUrl}/api/wallet/reset — 테스트용 토큰 충전 */
+    suspend fun resetWallet(baseUrl: String): Long =
+        client.post(baseUrl.trimEnd('/') + "/api/wallet/reset").body<WalletDto>().balance
 
     companion object {
         fun defaultHttpClient(): HttpClient = HttpClient {
