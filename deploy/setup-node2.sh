@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# node2(10.8.1.102)에서 실행 — 백엔드(9090)와 프론트(3000)를 설치·기동한다.
+# node2(10.8.2.5)에서 실행 — 백엔드(9090)와 프론트(3000)를 설치·기동한다.
 #
 #   tar -xzf trevit-deploy.tar.gz && cd trevit-deploy
 #   sudo ./setup-node2.sh
@@ -72,10 +72,10 @@ curl -fs -o /dev/null "http://localhost:$FRONTEND_PORT/" || {
 
 echo ""
 echo "완료 — node2 준비됨"
-echo "  백엔드  http://10.8.1.102:$BACKEND_PORT/api/wallet"
-echo "  프론트  http://10.8.1.102:$FRONTEND_PORT/"
+echo "  백엔드  http://10.8.2.5:$BACKEND_PORT/api/wallet"
+echo "  프론트  http://10.8.2.5:$FRONTEND_PORT/"
 echo ""
 echo "LLM(node1) 연결 확인:"
-curl -fs --max-time 5 http://10.8.1.101:1234/v1/models > /dev/null \
-  && echo "  10.8.1.101:1234 응답 O — AI 플랜 사용 가능" \
-  || echo "  10.8.1.101:1234 응답 X — 휴리스틱으로 동작합니다(서비스는 정상)"
+curl -fs --max-time 5 http://10.8.2.4:1234/v1/models > /dev/null \
+  && echo "  10.8.2.4:1234 응답 O — AI 플랜 사용 가능" \
+  || echo "  10.8.2.4:1234 응답 X — 휴리스틱으로 동작합니다(서비스는 정상)"

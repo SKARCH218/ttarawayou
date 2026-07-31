@@ -6,7 +6,7 @@
 
 set -euo pipefail
 
-NODE2=10.8.1.102
+NODE2=10.8.2.5
 BACKEND_PORT=9090
 FRONTEND_PORT=3000
 SRC="$(cd "$(dirname "$0")" && pwd)"

@@ -2,7 +2,7 @@
 # 개발 PC에서 실행 — 배포용 묶음(trevit-deploy.tar.gz)을 만든다.
 #
 #   ./build-bundle.sh
-#   scp trevit-deploy.tar.gz playlabs@10.8.1.102:~/
+#   scp trevit-deploy.tar.gz playlabs@10.8.2.5:~/
 #
 # 묶음 안: 백엔드 jar, 프론트(정적 웹 + Express), systemd 유닛, 환경변수 예시, 설치 스크립트
 
@@ -36,6 +36,6 @@ echo ""
 echo "완성: $OUT  ($(du -h "$OUT" | cut -f1))"
 echo ""
 echo "다음 단계:"
-echo "  scp $OUT playlabs@10.8.1.102:~/"
-echo "  ssh playlabs@10.8.1.102"
+echo "  scp $OUT playlabs@10.8.2.5:~/"
+echo "  ssh playlabs@10.8.2.5"
 echo "    tar -xzf trevit-deploy.tar.gz && cd trevit-deploy && sudo ./setup-node2.sh"

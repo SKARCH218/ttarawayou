@@ -1,4 +1,4 @@
-# 트레빗 백엔드 (node2 / 10.8.1.102)
+# 트레빗 백엔드 (node2 / 10.8.2.5)
 #
 #   sudo cp trevit-backend.service /etc/systemd/system/
 #   sudo systemctl daemon-reload
