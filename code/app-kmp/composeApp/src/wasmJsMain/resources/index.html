@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>트레빗 Travit</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body { height: 100%; }
+        body {
+            background: #e8ecef;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: system-ui, sans-serif;
+        }
+        /* 폰 프레임 — 앱 화면이 이 안에 그대로 렌더링된다 */
+        #trevitApp {
+            position: relative;
+            width: min(430px, 100vw);
+            height: min(100dvh, 932px);
+            background: #ffffff;
+            overflow: hidden;
+        }
+        @media (min-width: 480px) {
+            #trevitApp {
+                border-radius: 24px;
+                box-shadow: 0 24px 64px rgba(0, 0, 0, 0.28);
+                height: min(92dvh, 932px);
+            }
+        }
+        /* 로딩 중 표시 — absolute로 띄워야 캔버스가 밀려나지 않는다 (캔버스가 위에 그려져 가려짐) */
+        #trevitApp::before {
+            content: "트레빗 불러오는 중…";
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #8a9499;
+            font-size: 15px;
+        }
+    </style>
+</head>
+<body>
+<div id="trevitApp"></div>
+<script type="application/javascript" src="trevit-web.js"></script>
+</body>
+</html>

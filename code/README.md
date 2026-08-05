@@ -8,7 +8,8 @@
 
 | 구분 | 기술 | 포트 |
 |---|---|---|
-| 프론트엔드 | HTML / CSS / JS (정적 파일) + Express 서빙 | 3000 |
+| 프론트엔드 (웹) | Compose Multiplatform(wasm) — 안드로이드 앱과 같은 화면 코드 | 3000 |
+| 앱 (Android) | Jetpack Compose (`app-kmp/composeApp`, 웹과 코드 공유) | — |
 | 백엔드 API | Spring Boot 3 + JPA + H2 인메모리 DB | 8080 |
 | 지도 | Leaflet + OpenStreetMap 타일 (키 불필요) | — |
 | 도보 경로 | OSRM 공개 라우팅 서버 (키 불필요) | — |
@@ -25,14 +26,15 @@
    ODsay·data.go.kr 키는 선택 — 없으면 해당 부가기능만 자동 폴백된다.
    지도 웹페이지는 이 키를 백엔드(`/api/config`)에서 받아 쓰므로 **다른 파일은 수정할 필요 없음**.
 2. **`run-backend.bat`** 더블클릭 → 첫 실행이면 자동으로 빌드(몇 분) 후 8080 기동
-3. **`run-frontend.bat`** 더블클릭 → 웹 서버 (3000, 최초 실행 시 npm install 자동)
+3. **`run-app-web.bat`** 더블클릭 → Compose 웹 빌드 + 서빙 (3000)
 4. 브라우저에서 `http://localhost:3000`
 
 기타 배치 파일:
-- **`restart-servers.bat`** → 전부 끄고 셋 다 재시작 (코드 수정 후 반영용)
+- **`run.bat`** → 백엔드 + 웹을 탭 2개로 한 번에 실행
+- **`restart-servers.bat`** → 전부 끄고 재시작 (코드 수정 후 반영용)
 - **`stop-servers.bat`** → 전부 종료
-- **`run-debug.bat`** → 디버깅 웹 (3030): 전체 여정 패널·가상 시계·배속·자동 이동
-  (일반 앱 3000에는 디버깅 기능 없음)
+- **`run-app-web-dev.bat`** → 웹 개발 모드: 앱 화면 코드를 저장하면
+  자동으로 다시 빌드되고 브라우저가 새로고침됨 (디자인 작업용)
 
 TMAP 앱키 발급: [openapi.sk.com](https://openapi.sk.com) 가입 → 앱 생성 →
 상품 이용신청(TMAP, TMAP 대중교통) → 앱키 복사.
@@ -42,7 +44,8 @@ TMAP 앱키 발급: [openapi.sk.com](https://openapi.sk.com) 가입 → 앱 생�
 ### 웹 서버 수동 실행 (3000)
 
 ```bash
-cd frontend && npm install && npm start
+cd app-kmp && ./gradlew :composeApp:wasmJsBrowserDistribution
+npx --yes http-server app-kmp/composeApp/build/dist/wasmJs/productionExecutable -p 3000 -c-1
 ```
 
 브라우저에서 `http://localhost:3000` 접속.

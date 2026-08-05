@@ -48,9 +48,10 @@ allOpen {
     annotation("jakarta.persistence.Embeddable")
 }
 
-// 정적 웹 데모(../frontend/public)를 jar의 static/ 으로 포함 → 루트(/)에서 서빙
+// Compose 웹 빌드 결과물이 있으면 jar의 static/ 으로 포함 → 루트(/)에서 서빙
+// (먼저 code/app-kmp 에서 :composeApp:wasmJsBrowserDistribution 을 빌드해 둘 것)
 tasks.processResources {
-    from("../frontend/public") {
+    from("../app-kmp/composeApp/build/dist/wasmJs/productionExecutable") {
         into("static")
     }
 }

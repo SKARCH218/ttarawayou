@@ -16,6 +16,12 @@ kotlin {
     iosArm64()
     iosSimulatorArm64()
 
+    // 웹(Compose Multiplatform) — 앱과 같은 코드가 브라우저에서 돈다
+    @OptIn(org.jetbrains.kotlin.gradle.ExperimentalWasmDsl::class)
+    wasmJs {
+        browser()
+    }
+
     sourceSets {
         commonMain.dependencies {
             implementation(libs.kotlinx.coroutines.core)
@@ -29,6 +35,9 @@ kotlin {
         }
         iosMain.dependencies {
             implementation(libs.ktor.client.darwin)
+        }
+        wasmJsMain.dependencies {
+            implementation(libs.ktor.client.js)
         }
     }
 }

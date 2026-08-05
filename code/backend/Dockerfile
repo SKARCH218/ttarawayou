@@ -3,7 +3,9 @@
 FROM gradle:8.14-jdk21 AS build
 WORKDIR /workspace
 COPY backend/ backend/
-COPY frontend/public/ frontend/public/
+# 웹은 Compose Multiplatform(wasm) 앱으로 대체됨 — 미리 빌드해 뒀다면 함께 포함
+# (없으면 API 전용으로 동작. 빌드: code/app-kmp 에서 :composeApp:wasmJsBrowserDistribution)
+COPY app-kmp/composeApp/build/dist/wasmJs/productionExecutabl[e] app-kmp/composeApp/build/dist/wasmJs/productionExecutable/
 RUN cd backend && gradle bootJar --no-daemon -x test \
     && cp build/libs/*-SNAPSHOT.jar /workspace/app.jar
 
