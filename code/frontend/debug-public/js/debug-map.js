@@ -4,13 +4,20 @@
  * - 페이지가 열리면 경로를 따라 초당 10m 자동 이동 (도착 팝업도 자동 진행)
  * - 지도에 전체 경로를 주황 점선으로 상시 표시
  */
-(() => {
-  const mt = window.__mt;
+(function boot() {
   const $ = (id) => document.getElementById(id);
-  if (!mt) {
-    $('dbgBody').textContent = '디버그 훅(window.__mt)을 찾지 못했습니다. map.js 버전을 확인하세요.';
+  // map.js는 지도 SDK·플랜 준비가 끝난 뒤에야 훅(window.__mt)을 노출하므로 기다린다
+  if (!window.__mt) {
+    if (!window.__mtWaitStart) window.__mtWaitStart = Date.now();
+    if (Date.now() - window.__mtWaitStart > 20000) {
+      $('dbgBody').textContent = '디버그 훅(window.__mt)을 20초 내에 찾지 못했습니다. '
+        + '백엔드(8080) 실행 여부와 TMAP_APP_KEY 설정을 확인하세요.';
+      return;
+    }
+    setTimeout(boot, 200);
     return;
   }
+  const mt = window.__mt;
 
   const WALK_SPEED_M_PER_S = 10;     // 도보 구간: 초당 10m
   const TRANSIT_SPEED_M_PER_S = 100; // 대중교통 구간: 초당 100m
