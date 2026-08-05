@@ -58,6 +58,7 @@ import com.trevit.app.BUDGET_STEP
 import com.trevit.app.MIN_BUDGET
 import com.trevit.app.R
 import com.trevit.app.REGIONS
+import com.trevit.app.Screen
 import kotlinx.coroutines.launch
 
 /**
@@ -76,6 +77,38 @@ fun SetupScreen(state: AppState) {
 
     Box(Modifier.fillMaxWidth()) {
         WebScreen {
+            // 웹 `.auth-chip` — 로그인한 닉네임과 로그아웃
+            state.auth.user?.let { user ->
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        "${user.nickname}님",
+                        fontSize = 12.5.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = webTextFaint(),
+                    )
+                    Surface(
+                        onClick = { scope.launch { state.auth.logout(); state.screen = Screen.Login } },
+                        shape = RoundedCornerShape(50),
+                        color = webFill(),
+                        border = BorderStroke(1.dp, webBorder()),
+                        modifier = Modifier.padding(start = 8.dp),
+                    ) {
+                        Text(
+                            "로그아웃",
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = webTextLabel(),
+                        )
+                    }
+                }
+                Spacer(Modifier.height(6.dp))
+            }
+
             // 웹 `.brand-logo { width: 92px; margin: 0 auto 6px }` — 원본 비율 134:113
             Icon(
                 painter = painterResource(R.drawable.ic_travit_logo),

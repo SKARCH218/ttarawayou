@@ -56,8 +56,12 @@ fun IntroScreen(state: AppState) {
         wordmarkVisible = true
         delay(TAGLINE_DELAY_MS - WORDMARK_DELAY_MS)
         taglineVisible = true
+        // 인트로가 도는 동안 저장된 토큰이 아직 유효한지 확인해 둔다
+        val loggedIn = state.auth.restoreSession()
         delay(AUTO_ADVANCE_MS - TAGLINE_DELAY_MS)
-        if (state.screen is Screen.Intro) state.screen = Screen.Setup
+        if (state.screen is Screen.Intro) {
+            state.screen = if (loggedIn) Screen.Setup else Screen.Login
+        }
     }
 
     val symbolAlpha by animateFloatAsState(
@@ -88,7 +92,8 @@ fun IntroScreen(state: AppState) {
             // 웹 `.intro { background: mono-000 }` — 인트로만 순백이다
             .background(if (isDarkIntro()) webSurface() else Color.White)
             .clickable(interactionSource = interaction, indication = null) {
-                state.screen = Screen.Setup
+                // 탭해서 건너뛰어도 로그인 여부는 그대로 따른다
+                state.screen = if (state.auth.isLoggedIn) Screen.Setup else Screen.Login
             },
         contentAlignment = Alignment.Center,
     ) {

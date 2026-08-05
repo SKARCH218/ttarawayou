@@ -17,6 +17,34 @@ spring:
       enabled: true
       path: /h2-console
 
+  # 회원가입 인증메일 발송용 SMTP.
+  # MAIL_HOST가 비어 있으면 발송하지 않고 인증코드를 서버 로그에 출력한다(개발·시연용).
+  # Gmail을 쓸 경우: MAIL_HOST=smtp.gmail.com, MAIL_PORT=587,
+  #   MAIL_USERNAME=계정@gmail.com, MAIL_PASSWORD=앱 비밀번호(16자리, 일반 비밀번호 아님)
+  mail:
+    host: ${MAIL_HOST:}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+
+trevit:
+  mail:
+    # 받는 사람에게 보이는 발신자. Gmail은 실제 계정 주소로 덮어써서 나갈 수 있다
+    from: ${MAIL_FROM:트레빗 <no-reply@trevit.app>}
+
+# 구글 로그인 (Google Identity Services).
+# Google Cloud 콘솔 → 사용자 인증 정보 → OAuth 클라이언트 ID(웹)에서 발급받고
+# 승인된 자바스크립트 원본에 접속 주소를 등록해야 한다.
+# 값이 비어 있으면 로그인 화면에 구글 버튼이 아예 뜨지 않는다.
+google:
+  client-id: ${GOOGLE_CLIENT_ID:}
+
 # ODsay 대중교통 API 키 (없으면 거리 기반 추정으로 자동 폴백)
 odsay:
   api-key: ${ODSAY_API_KEY:}

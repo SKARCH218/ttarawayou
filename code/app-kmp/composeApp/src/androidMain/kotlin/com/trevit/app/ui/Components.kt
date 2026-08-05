@@ -92,6 +92,12 @@ val WebOrangeDark = Color(0xFFE65100)
 /** accent-blue-500 — 교통비 바 */
 val WebBlue = Color(0xFF1490EB)
 
+/** error-default — 입력 오류·인증 실패 (웹 `.error-box`, `.field-hint.error`) */
+val WebError = Color(0xFFE21235)
+
+/** warning-default — 비밀번호 강도 중간 단계 */
+val WebWarning = Color(0xFFFF9800)
+
 // ── 무채색 (라이트 기준값. 다크는 아래 web*() 함수가 바꿔 준다) ──
 private val Mono030 = Color(0xFFF9FBFB)
 private val Mono050 = Color(0xFFF3F6F6)

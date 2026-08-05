@@ -36,6 +36,8 @@ fun TrevitApp(state: AppState) {
             ) { screen ->
                 when (screen) {
                     is Screen.Intro -> IntroScreen(state)
+                    is Screen.Login -> LoginScreen(state)
+                    is Screen.Signup -> SignupScreen(state)
                     is Screen.Setup -> SetupScreen(state)
                     is Screen.Profile -> ProfileScreen(state)
                     is Screen.Generating -> GeneratingScreen(state)

@@ -26,6 +26,10 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
+    // 비밀번호 BCrypt 해싱만 사용 (Security 필터체인·자동설정은 쓰지 않는다)
+    implementation("org.springframework.security:spring-security-crypto")
+    // 회원가입 메일 인증 — SMTP가 설정돼 있을 때만 실제로 발송한다
+    implementation("org.springframework.boot:spring-boot-starter-mail")
     implementation("org.jetbrains.kotlin:kotlin-reflect")
     runtimeOnly("com.h2database:h2")
     testImplementation("org.springframework.boot:spring-boot-starter-test")

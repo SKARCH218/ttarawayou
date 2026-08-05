@@ -1,4 +1,4 @@
-@echo off
+ @echo off
 setlocal enabledelayedexpansion
 rem Travit backend (Kotlin + Spring Boot) - port 8080
 rem Windows version of run-backend.sh. API keys are read from code\.env (see .env.example).

@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>트레빗 — 여행 만들기</title>
   <link rel="icon" href="brand/travit-symbol.svg" type="image/svg+xml" />
-  <link rel="stylesheet" href="css/ogq-tokens.css?v=30" />
-  <link rel="stylesheet" href="css/style.css?v=30" />
+  <link rel="stylesheet" href="css/ogq-tokens.css?v=31" />
+  <link rel="stylesheet" href="css/style.css?v=31" />
 </head>
-<body>
+<body data-auth="required">
   <div class="phone">
     <div class="app">
       <!-- 인트로: 로고가 뜬 뒤 자동으로 사라진다 (탭하면 즉시 스킵) -->
@@ -19,6 +19,8 @@
       </div>
 
       <div class="screen">
+        <!-- 로그인한 닉네임 / 로그아웃 — 내용은 common.js가 채운다 -->
+        <div class="auth-chip" id="authChip"></div>
         <img class="brand-logo" src="brand/travit-logo-full.svg" alt="트레빗" />
         <h1 class="title">어디로 떠나볼까요?</h1>
         <p class="subtitle">장소는 도착 전까지 비밀</p>
@@ -78,7 +80,7 @@
     </div>
   </div>
 
-  <script src="js/common.js?v=30"></script>
-  <script src="js/setup.js?v=30"></script>
+  <script src="js/common.js?v=31"></script>
+  <script src="js/setup.js?v=31"></script>
 </body>
 </html>

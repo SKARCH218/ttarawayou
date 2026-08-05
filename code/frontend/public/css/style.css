@@ -532,3 +532,137 @@ h1.title {
   color: var(--ogq-color-semantic-error-dark); font-size: 13.5px; line-height: 1.6; display: none;
 }
 .error-box.show { display: block; }
+
+/* ============ 회원가입 · 로그인 ============ */
+.auth-screen {
+  flex: 1; display: flex; flex-direction: column; justify-content: center;
+  padding: calc(28px + env(safe-area-inset-top)) 22px 28px;
+}
+.auth-screen .brand-logo { width: 104px; margin-bottom: var(--ogq-spacing-6); }
+.auth-screen .card { margin-top: var(--ogq-spacing-9, 18px); }
+.auth-screen .field:last-of-type { margin-bottom: 0; }
+
+/* 텍스트 입력 — .field input 의 단위(원/토큰)용 오른쪽 여백을 쓰지 않는다 */
+.field input.auth-input {
+  padding: 15px 16px;
+  font-size: 15.5px; font-weight: var(--ogq-font-weight-semibold);
+}
+.field input.auth-input::placeholder { color: var(--ogq-color-mono-300); font-weight: var(--ogq-font-weight-semibold); }
+.field input.auth-input.has-toggle { padding-right: 52px; }
+.field input.auth-input.invalid { border-color: var(--ogq-color-semantic-error-default); }
+
+/* 비밀번호 표시/숨김 — 디자인 시스템 Show·Hide 아이콘 */
+.pw-toggle {
+  position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+  width: 36px; height: 36px; border-radius: var(--ogq-radius-md);
+  background: transparent; border: none;
+  display: flex; align-items: center; justify-content: center;
+  transition: background var(--ogq-duration-fast) var(--ogq-easing-default);
+}
+.pw-toggle:active { background: var(--ogq-color-mono-050); }
+.pw-toggle .ds-icon { width: 21px; height: 21px; filter: brightness(0) opacity(.45); }
+.pw-toggle:active .ds-icon { filter: brightness(0) opacity(.7); }
+
+/* 입력 아래 안내 문구 — 오류일 때만 빨갛게 */
+.field-hint {
+  margin-top: 7px; font-size: 12.5px; line-height: 1.5;
+  color: var(--ogq-color-mono-500); font-weight: var(--ogq-font-weight-semibold);
+}
+.field-hint.error { color: var(--ogq-color-semantic-error-dark); }
+.field-hint.ok { color: var(--ogq-color-primary-800); }
+
+/* 비밀번호 강도 막대 */
+.pw-meter { display: flex; gap: 4px; margin-top: 8px; }
+.pw-meter i {
+  flex: 1; height: 3px; border-radius: 99px; background: var(--ogq-color-mono-100);
+  transition: background var(--ogq-duration-fast) var(--ogq-easing-default);
+}
+.pw-meter.lv1 i:nth-child(1) { background: var(--ogq-color-semantic-error-default); }
+.pw-meter.lv2 i:nth-child(-n+2) { background: var(--ogq-color-semantic-warning-default); }
+.pw-meter.lv3 i { background: var(--ogq-color-primary-500); }
+
+/* 하단 전환 링크 (로그인 ⇄ 회원가입) */
+.auth-switch {
+  margin-top: var(--ogq-spacing-8); text-align: center;
+  font-size: 13.5px; color: var(--ogq-color-mono-500); font-weight: var(--ogq-font-weight-semibold);
+}
+.auth-switch a {
+  color: var(--ogq-color-primary-700); font-weight: var(--ogq-font-weight-bold);
+  text-decoration: underline; text-underline-offset: 3px; margin-left: 6px;
+}
+
+/* 약관 동의 */
+.auth-terms {
+  display: flex; align-items: flex-start; gap: 9px;
+  margin-top: var(--ogq-spacing-7, 14px);
+  font-size: 12.5px; color: var(--ogq-color-mono-600); line-height: 1.55;
+}
+.auth-terms input { width: 19px; height: 19px; flex-shrink: 0; margin-top: 1px; accent-color: var(--ogq-color-primary-500); }
+
+/* 버튼 안 로딩 표시 */
+.btn-primary.loading { pointer-events: none; opacity: .75; }
+
+/* 홈 상단 계정 칩 */
+.auth-chip {
+  display: flex; align-items: center; justify-content: flex-end; gap: 8px;
+  min-height: 26px; margin-bottom: var(--ogq-spacing-4);
+  font-size: 12.5px; font-weight: var(--ogq-font-weight-semibold); color: var(--ogq-color-mono-500);
+}
+.auth-chip-btn {
+  padding: 6px 12px; border-radius: var(--ogq-radius-full);
+  background: var(--ogq-color-mono-050); color: var(--ogq-color-mono-700);
+  border: 1px solid var(--ogq-color-mono-080);
+  font-size: 12px; font-weight: var(--ogq-font-weight-bold);
+  text-decoration: none; line-height: 1.5;
+}
+.auth-chip-btn:active { background: var(--ogq-color-mono-100); }
+
+/* ============ 메일 인증 (회원가입) ============ */
+/* 입력칸 + 오른쪽 버튼 한 줄 */
+.verify-row { display: flex; gap: 8px; align-items: stretch; }
+.verify-row .input-wrap { flex: 1; min-width: 0; }
+.verify-btn {
+  flex-shrink: 0; padding: 0 14px; border-radius: var(--ogq-radius-lg);
+  background: var(--ogq-color-primary-050); color: var(--ogq-color-primary-800);
+  border: 1px solid var(--ogq-color-primary-100);
+  font-size: 13px; font-weight: var(--ogq-font-weight-bold); white-space: nowrap;
+  transition: background var(--ogq-duration-fast) var(--ogq-easing-default);
+}
+.verify-btn:active { background: var(--ogq-color-primary-080); }
+.verify-btn:disabled {
+  background: var(--ogq-color-mono-050); color: var(--ogq-color-mono-400);
+  border-color: var(--ogq-color-mono-080);
+}
+
+/* 인증번호 — 자릿수가 보이도록 넓게 */
+.field input.auth-input.code-input {
+  letter-spacing: 6px; font-size: 18px; font-weight: var(--ogq-font-weight-bold);
+  padding-right: 62px;
+}
+.field input.auth-input.code-input::placeholder { letter-spacing: 6px; }
+.code-timer {
+  position: absolute; right: 14px; top: 50%; transform: translateY(-50%);
+  font-size: 13px; font-weight: var(--ogq-font-weight-bold);
+  color: var(--ogq-color-semantic-error-default); font-variant-numeric: tabular-nums;
+}
+
+/* 인증이 끝난 이메일칸 */
+.field input.auth-input.verified {
+  background: var(--ogq-color-primary-030); border-color: var(--ogq-color-primary-200);
+  color: var(--ogq-color-mono-700);
+}
+
+/* ============ 소셜 로그인 ============ */
+.social-block { margin-top: var(--ogq-spacing-8); }
+.auth-divider {
+  display: flex; align-items: center; gap: var(--ogq-spacing-6);
+  margin-bottom: var(--ogq-spacing-7, 14px);
+}
+.auth-divider::before, .auth-divider::after {
+  content: ''; flex: 1; height: 1px; background: var(--ogq-color-mono-080);
+}
+.auth-divider span {
+  font-size: 12.5px; color: var(--ogq-color-mono-400); font-weight: var(--ogq-font-weight-semibold);
+}
+/* 구글이 iframe으로 그려 주는 버튼을 가운데로 */
+#googleBtn { display: flex; justify-content: center; min-height: 44px; }
