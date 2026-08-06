@@ -1,0 +1,8 @@
+# node2 전용 — GitHub OGQ 브랜치를 주기적으로 확인해 변경분만 빌드·배포한다.
+# 실제 로직은 ~/deploy.sh (deploy-node2.sh 로 scp 됨). 이 유닛은 그걸 호출만 한다.
+[Unit]
+Description=Trevit auto-deploy (OGQ 브랜치 변경 감지 시 빌드·배포)
+
+[Service]
+Type=oneshot
+ExecStart=%h/deploy.sh

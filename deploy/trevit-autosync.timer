@@ -1,0 +1,12 @@
+# 부팅 2분 후 시작, 이후 5분 간격. fetch 만 하고 변경 없으면 바로 끝나므로
+# 5분은 부담 없는 주기다 — 실제 빌드는 새 커밋이 있을 때만 돈다.
+[Unit]
+Description=Trevit auto-deploy 타이머 (5분마다 확인)
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+Persistent=true
+
+[Install]
+WantedBy=timers.target
