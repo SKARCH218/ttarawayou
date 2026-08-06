@@ -68,6 +68,14 @@ class AuthState(
     var busy by mutableStateOf(false)
         private set
 
+    /**
+     * [sendCode] 가 실제로 서버에 요청을 보내고 있는 동안만 true.
+     * "인증요청" 버튼이 눌러도 텍스트가 안 바뀌어 멈춘 것처럼 보인다는 신고가 있어 추가했다 —
+     * [busy] 는 로그인·가입·인증확인까지 공유하는 값이라 이 버튼만 콕 집어 "발송 중…"을 보여줄 수 없었다.
+     */
+    var sendingCode by mutableStateOf(false)
+        private set
+
     /** 화면 하단 오류 상자 (웹 `.error-box`) */
     var errorMessage by mutableStateOf<String?>(null)
 
@@ -151,13 +159,18 @@ class AuthState(
             errorMessage = "이메일 형식이 올바르지 않아요."
             return false
         }
-        return run("인증코드 발송") {
-            val seconds = repository.sendCode(baseUrlProvider(), email)
-            codeSent = true
-            codeSecondsLeft = seconds.toInt()
-            resendSecondsLeft = RESEND_COOLDOWN_SECONDS
-            signupCode = ""
-            setCodeMessage("메일로 받은 6자리 숫자를 입력해 주세요", isError = false)
+        sendingCode = true
+        try {
+            return run("인증코드 발송") {
+                val seconds = repository.sendCode(baseUrlProvider(), email)
+                codeSent = true
+                codeSecondsLeft = seconds.toInt()
+                resendSecondsLeft = RESEND_COOLDOWN_SECONDS
+                signupCode = ""
+                setCodeMessage("메일로 받은 6자리 숫자를 입력해 주세요", isError = false)
+            }
+        } finally {
+            sendingCode = false
         }
     }
 

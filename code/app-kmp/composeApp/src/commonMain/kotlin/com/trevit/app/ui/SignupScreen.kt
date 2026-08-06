@@ -132,6 +132,7 @@ private fun EmailWithVerify(auth: AuthState, scope: kotlinx.coroutines.Coroutine
         VerifyButton(
             text = when {
                 auth.emailVerified -> "인증완료"
+                auth.sendingCode -> "발송 중…"
                 auth.resendSecondsLeft > 0 -> "재발송 ${auth.resendSecondsLeft}"
                 auth.codeSent -> "재발송"
                 else -> "인증요청"
