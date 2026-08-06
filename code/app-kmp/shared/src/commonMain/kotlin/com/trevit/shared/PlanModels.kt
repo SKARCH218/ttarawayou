@@ -26,9 +26,17 @@ data class PlanRequest(
     val startLongitude: Double? = null,
 )
 
-/** GET /api/wallet · POST /api/wallet/reset 응답 */
+/** GET /api/wallet · POST /api/wallet/reset · POST /api/wallet/purchase 응답 */
 @Serializable
 data class WalletDto(val balance: Long = 0)
+
+/** GET /api/wallet/products 의 항목 하나. 고정환율제라 tokens 가 곧 원화 가격이다 */
+@Serializable
+data class WalletProductDto(val id: String, val tokens: Long, val badge: String? = null)
+
+/** POST /api/wallet/purchase 요청 본문 */
+@Serializable
+data class PurchaseRequest(val productId: String)
 
 /** 예산 배분 내역 */
 @Serializable

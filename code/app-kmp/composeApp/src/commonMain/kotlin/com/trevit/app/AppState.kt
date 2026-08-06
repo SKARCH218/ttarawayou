@@ -8,6 +8,7 @@ import androidx.compose.runtime.setValue
 import com.trevit.shared.PlanRepository
 import com.trevit.shared.PlanRequest
 import com.trevit.shared.PlanResponse
+import com.trevit.shared.WalletProductDto
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -131,16 +132,54 @@ class AppState(
         budget = clampBudget(budget)
     }
 
-    /** 테스트용 토큰 충전 (웹 chargeBtn) */
-    suspend fun chargeWallet() {
+    // ---- 토큰 구매 (우측 상단 "토큰 구매" 버튼 → 상품 목록 다이얼로그) ----
+
+    var showStore by mutableStateOf(false)
+    var storeProducts by mutableStateOf<List<WalletProductDto>>(emptyList())
+    var storeLoading by mutableStateOf(false)
+    var storeError by mutableStateOf<String?>(null)
+    /** 방금 구매를 완료한 상품 id — 다이얼로그에 짧게 "구매 완료"를 보여주는 용도 */
+    var storeJustPurchasedId by mutableStateOf<String?>(null)
+    /** 구매 버튼을 누른 상품 id (그 버튼만 로딩 표시) */
+    var storePendingId by mutableStateOf<String?>(null)
+
+    fun openStore() {
+        showStore = true
+        storeError = null
+        storeJustPurchasedId = null
+    }
+
+    /** GET /api/wallet/products — 스토어를 열 때 한 번 불러온다 */
+    suspend fun loadStoreProducts() {
+        if (storeProducts.isNotEmpty()) return
+        storeLoading = true
         try {
-            walletBalance = withContext(Dispatchers.Default) { repository.resetWallet(baseUrl) }
+            storeProducts = withContext(Dispatchers.Default) { repository.fetchWalletProducts(baseUrl) }
+            storeError = null
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            storeError = "상품을 불러오지 못했어요 — 서버 연결을 확인해 주세요."
+        } finally {
+            storeLoading = false
+        }
+    }
+
+    /** POST /api/wallet/purchase — 1토큰 = 1원 고정환율, 결제 시뮬레이션 */
+    suspend fun purchase(productId: String) {
+        storePendingId = productId
+        try {
+            walletBalance = withContext(Dispatchers.Default) { repository.purchaseWallet(baseUrl, productId) }
+            storeJustPurchasedId = productId
+            storeError = null
             setupError = null
             budget = clampBudget(budget)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            setupError = "충전에 실패했어요 — 서버 연결을 확인해 주세요."
+            storeError = "구매에 실패했어요 — 서버 연결을 확인해 주세요."
+        } finally {
+            storePendingId = null
         }
     }
 

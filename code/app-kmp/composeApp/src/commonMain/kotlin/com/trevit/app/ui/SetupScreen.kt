@@ -60,6 +60,7 @@ import com.trevit.app.MIN_BUDGET
 import com.trevit.app.resources.*
 import com.trevit.app.REGIONS
 import com.trevit.app.Screen
+import com.trevit.shared.WalletProductDto
 import kotlinx.coroutines.launch
 
 /**
@@ -76,15 +77,17 @@ fun SetupScreen(state: AppState) {
 
     LaunchedEffect(state.baseUrl) { state.loadWallet() }
 
-    Box(Modifier.fillMaxWidth()) {
-        WebScreen {
-            // 웹 `.auth-chip` — 로그인한 닉네임과 로그아웃
-            state.auth.user?.let { user ->
-                Row(
-                    Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
+    WebScreen {
+        // 상단 바 — 토큰 구매(항상) + 로그인 상태(닉네임/로그아웃, 있을 때만) + 서버 주소.
+        // 예전엔 이 자리와 우측 상단 절대 위치 버튼이 서로 겹쳤다 — 한 줄로 합쳐서 없앴다.
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                StoreButton(onClick = { state.openStore() })
+                state.auth.user?.let { user ->
+                    Spacer(Modifier.width(8.dp))
                     Text(
                         "${user.nickname}님",
                         fontSize = 12.5.sp,
@@ -107,8 +110,19 @@ fun SetupScreen(state: AppState) {
                         )
                     }
                 }
-                Spacer(Modifier.height(6.dp))
+                IconButton(
+                    onClick = { showSettings = true },
+                    modifier = Modifier.size(32.dp),
+                ) {
+                    Icon(
+                        painterResource(Res.drawable.ic_settings),
+                        contentDescription = "서버 주소",
+                        tint = webTextDecor().copy(alpha = 0.45f),
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
             }
+            Spacer(Modifier.height(6.dp))
 
             // 웹 `.brand-logo { width: 92px; margin: 0 auto 6px }` — 원본 비율 134:113
             Icon(
@@ -133,7 +147,7 @@ fun SetupScreen(state: AppState) {
                     onSelect = { state.region = it },
                 )
                 Spacer(Modifier.height(16.dp))
-                BudgetField(state) { scope.launch { state.chargeWallet() } }
+                BudgetField(state)
                 Spacer(Modifier.height(16.dp))
                 // 웹 `.field-row { display:flex; gap:10px }` — 기간·인원을 나란히
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -159,7 +173,7 @@ fun SetupScreen(state: AppState) {
                     val balance = state.walletBalance ?: 0
                     if (state.budget > balance) {
                         state.setupError =
-                            "보유 토큰(${comma(balance)})이 부족해요. 충전 버튼을 눌러 주세요."
+                            "보유 토큰(${comma(balance)})이 부족해요. 토큰 구매 버튼을 눌러 주세요."
                     } else {
                         state.setupError = null
                         state.startProfile()
@@ -168,24 +182,10 @@ fun SetupScreen(state: AppState) {
                 enabled = state.region != null,
                 modifier = Modifier.fillMaxWidth(),
             )
-        }
+    }
 
-        // 서버 주소 설정 — 웹에는 없지만 실제 폰에서 백엔드 주소를 바꾸려면 필요하다.
-        // 웹 화면을 흐트러뜨리지 않도록 모서리에 흐리게 둔다.
-        IconButton(
-            onClick = { showSettings = true },
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(top = 24.dp, end = 4.dp)
-                .size(32.dp),
-        ) {
-            Icon(
-                painterResource(Res.drawable.ic_settings),
-                contentDescription = "서버 주소",
-                tint = webTextDecor().copy(alpha = 0.45f),
-                modifier = Modifier.size(18.dp),
-            )
-        }
+    if (state.showStore) {
+        StoreDialog(state)
     }
 
     if (showSettings) {
@@ -276,10 +276,10 @@ private fun RegionField(
 }
 
 /**
- * 웹 `.field` 의 예산 칸 — 큰 숫자(누르면 직접 입력) + 슬라이더 + 보유 토큰/충전.
+ * 웹 `.field` 의 예산 칸 — 큰 숫자(누르면 직접 입력) + 슬라이더 + 보유 토큰.
  */
 @Composable
-private fun BudgetField(state: AppState, onCharge: () -> Unit) {
+private fun BudgetField(state: AppState) {
     var editing by remember { mutableStateOf(false) }
 
     Column {
@@ -358,26 +358,19 @@ private fun BudgetField(state: AppState, onCharge: () -> Unit) {
             )
         }
 
-        // 웹 `.wallet-row` — 점선 위에 "보유 N 토큰"과 충전 버튼
+        // 웹 `.wallet-row` — 점선 위에 "보유 N 토큰" (구매는 우측 상단 버튼으로 이동했다)
         Spacer(Modifier.height(14.dp))
         DashedDivider()
         Spacer(Modifier.height(12.dp))
-        Row(
-            Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("보유 ", fontSize = 14.sp, color = webTextMuted())
-                Text(
-                    state.walletBalance?.let { "${comma(it)} 토큰" } ?: "…",
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold,
-                    // warning-dark 는 어두운 배경에서 묻히므로 다크에서는 한 단계 밝게
-                    color = if (isDark()) WebOrange else WebOrangeDark,
-                )
-            }
-            ChargeButton(onCharge)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("보유 ", fontSize = 14.sp, color = webTextMuted())
+            Text(
+                state.walletBalance?.let { "${comma(it)} 토큰" } ?: "…",
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+                // warning-dark 는 어두운 배경에서 묻히므로 다크에서는 한 단계 밝게
+                color = if (isDark()) WebOrange else WebOrangeDark,
+            )
         }
     }
 }
@@ -429,22 +422,122 @@ private fun BudgetInlineEditor(
     )
 }
 
-/** 웹 `.charge-btn` — 패딩 7/13, radius 8, primary-050 배경 */
+/** 우측 상단 "토큰 구매" 버튼 — 민트 배경으로 서버 주소 톱니바퀴보다 눈에 띄게 한다 */
 @Composable
-private fun ChargeButton(onClick: () -> Unit) {
+private fun StoreButton(onClick: () -> Unit) {
     Surface(
         onClick = onClick,
-        shape = RoundedCornerShape(8.dp),
-        color = if (isDark()) Color(0xFF10453A) else Color(0xFFDAF5EC),
-        border = BorderStroke(1.dp, if (isDark()) Color(0xFF2E7C66) else Color(0xFFB5E5D7)),
+        shape = RoundedCornerShape(50),
+        color = WebMint,
     ) {
-        Box(Modifier.padding(horizontal = 13.dp, vertical = 7.dp)) {
-            Text(
-                "충전",
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold,
-                color = if (isDark()) Color(0xFF7FDEC1) else Color(0xFF009969),
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                painterResource(Res.drawable.ic_add_plus),
+                contentDescription = null,
+                tint = Color.White,
+                modifier = Modifier.size(13.dp),
             )
+            Spacer(Modifier.width(4.dp))
+            Text("토큰 구매", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
+        }
+    }
+}
+
+/**
+ * 토큰 구매 다이얼로그 — 고정환율제(1토큰 = 1원) 상품 목록.
+ * 실제 결제(PG) 연동 전이라 누르면 곧바로 보유 토큰에 더해진다(결제 시뮬레이션).
+ */
+@Composable
+private fun StoreDialog(state: AppState) {
+    val scope = rememberCoroutineScope()
+    LaunchedEffect(Unit) { state.loadStoreProducts() }
+
+    AlertDialog(
+        onDismissRequest = { state.showStore = false },
+        title = { Text("토큰 구매") },
+        text = {
+            Column {
+                Text(
+                    "1토큰 = 1원 고정환율 · 실제 결제 없이 바로 충전돼요",
+                    fontSize = 12.sp,
+                    color = webTextMuted(),
+                )
+                Spacer(Modifier.height(14.dp))
+                when {
+                    state.storeLoading -> Text("불러오는 중…", fontSize = 13.sp, color = webTextMuted())
+                    state.storeError != null -> Text(
+                        state.storeError!!,
+                        fontSize = 13.sp,
+                        color = Color(0xFFC90E2E),
+                    )
+                    else -> Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        state.storeProducts.forEach { product ->
+                            ProductRow(
+                                product = product,
+                                pending = state.storePendingId == product.id,
+                                justPurchased = state.storeJustPurchasedId == product.id,
+                                onBuy = { scope.launch { state.purchase(product.id) } },
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { state.showStore = false }) { Text("닫기") }
+        },
+    )
+}
+
+@Composable
+private fun ProductRow(
+    product: WalletProductDto,
+    pending: Boolean,
+    justPurchased: Boolean,
+    onBuy: () -> Unit,
+) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .border(1.dp, webBorder(), RoundedCornerShape(10.dp))
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Column {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("${comma(product.tokens)} 토큰", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = webText())
+                product.badge?.let {
+                    Spacer(Modifier.width(6.dp))
+                    Surface(shape = RoundedCornerShape(50), color = Color(0xFFDAF5EC)) {
+                        Text(
+                            it,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF009969),
+                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp),
+                        )
+                    }
+                }
+            }
+            Text("₩${comma(product.tokens)}", fontSize = 12.sp, color = webTextMuted())
+        }
+        Surface(
+            onClick = onBuy,
+            shape = RoundedCornerShape(8.dp),
+            color = if (justPurchased) Color(0xFFDAF5EC) else WebMint,
+        ) {
+            Box(Modifier.padding(horizontal = 16.dp, vertical = 9.dp)) {
+                Text(
+                    if (pending) "…" else if (justPurchased) "구매 완료" else "구매",
+                    fontSize = 12.5.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = if (justPurchased) Color(0xFF009969) else Color.White,
+                )
+            }
         }
     }
 }

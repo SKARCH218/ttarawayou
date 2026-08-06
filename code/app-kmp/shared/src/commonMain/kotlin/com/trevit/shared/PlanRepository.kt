@@ -41,6 +41,22 @@ class PlanRepository(
     suspend fun resetWallet(baseUrl: String): Long =
         client.post(baseUrl.trimEnd('/') + "/api/wallet/reset").body<WalletDto>().balance
 
+    /** GET {baseUrl}/api/wallet/products — 구매 가능한 토큰 상품 목록 */
+    suspend fun fetchWalletProducts(baseUrl: String): List<WalletProductDto> =
+        client.get(baseUrl.trimEnd('/') + "/api/wallet/products").body()
+
+    /** POST {baseUrl}/api/wallet/purchase — 상품 구매(결제 시뮬레이션), 새 잔액을 돌려준다 */
+    suspend fun purchaseWallet(baseUrl: String, productId: String): Long {
+        val response = client.post(baseUrl.trimEnd('/') + "/api/wallet/purchase") {
+            contentType(ContentType.Application.Json)
+            setBody(PurchaseRequest(productId))
+        }
+        if (!response.status.isSuccess()) {
+            throw PlanApiException("구매에 실패했어요 (${response.status.value})")
+        }
+        return response.body<WalletDto>().balance
+    }
+
     companion object {
         fun defaultHttpClient(): HttpClient = HttpClient {
             install(ContentNegotiation) {
