@@ -25,8 +25,13 @@ import org.jetbrains.compose.resources.ExperimentalResourceApi
  */
 @OptIn(ExperimentalComposeUiApi::class, ExperimentalResourceApi::class)
 fun main() {
-    // 안드로이드 기본값(10.0.2.2)은 에뮬레이터 전용 — 웹은 접속한 호스트의 8080 포트가 기본
-    val webDefaultBaseUrl = "http://${window.location.hostname.ifBlank { "localhost" }}:8080"
+    // 안드로이드 기본값(10.0.2.2)은 에뮬레이터 전용.
+    // 로컬 개발(run-app-web.sh, 웹은 3000·백엔드는 8080 별도 프로세스)만 :8080 을 붙인다.
+    // 그 외(운영 배포 등)는 백엔드 jar 가 정적 파일까지 같이 서빙하므로 같은 origin 이 곧 API 서버다.
+    // 예전엔 항상 :8080 을 붙였는데, 운영은 80 포트(URL에 포트 표시 없음)라 API 요청이
+    // 존재하지 않는 8080으로 나가 응답 없이 조용히 멈췄다 — "이메일 인증 버튼이 멈춘다" 신고의 원인.
+    val loc = window.location
+    val webDefaultBaseUrl = if (loc.port == "3000") "http://${loc.hostname.ifBlank { "localhost" }}:8080" else loc.origin
 
     ComposeViewport(document.getElementById("trevitApp")!!) {
         // 웹(스키아)은 브라우저 시스템 폰트를 못 쓰므로 한글 폰트(Pretendard)를 폴백으로 등록.
