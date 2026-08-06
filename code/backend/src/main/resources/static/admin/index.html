@@ -1,0 +1,332 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="robots" content="noindex, nofollow" />
+<title>트레빗 관리자</title>
+<style>
+  :root {
+    --mint: #03B083; --mint-deep: #029c73; --dark: #0B3B2E;
+    --bg: #F4F6F5; --card: #FFFFFF; --border: #E3EBE8;
+    --text: #17241F; --muted: #6B7A75;
+    --red: #D64545; --red-bg: #FCEAEA;
+    --green-bg: #E8F8F1; --gray-bg: #F0F2F1;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: "Apple SD Gothic Neo", "Pretendard", -apple-system, sans-serif;
+    font-size: 14px;
+  }
+  header {
+    background: var(--dark); color: #fff; padding: 16px 24px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  header h1 { font-size: 17px; margin: 0; font-weight: 700; }
+  header h1 span { color: var(--mint); }
+  header .sub { font-size: 12px; color: #B9CFC6; margin-top: 2px; }
+  #logoutBtn {
+    background: transparent; border: 1px solid #3A5A4F; color: #D7E5DF;
+    padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px;
+  }
+  main { max-width: 980px; margin: 0 auto; padding: 24px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin-bottom: 24px; }
+  .card {
+    background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+    padding: 16px 18px;
+  }
+  .card h3 {
+    margin: 0 0 10px; font-size: 12px; color: var(--muted); font-weight: 600;
+    text-transform: uppercase; letter-spacing: .03em;
+  }
+  .badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 600;
+  }
+  .badge.up { background: var(--green-bg); color: var(--mint-deep); }
+  .badge.down { background: var(--red-bg); color: var(--red); }
+  .badge.off { background: var(--gray-bg); color: var(--muted); }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+  .big { font-size: 26px; font-weight: 700; color: var(--dark); }
+  .row { display: flex; justify-content: space-between; align-items: center; margin-top: 6px; font-size: 12.5px; color: var(--muted); }
+  .row b { color: var(--text); font-weight: 600; }
+  .kv { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+  section.panel {
+    background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+    margin-bottom: 20px; overflow: hidden;
+  }
+  section.panel > h2 {
+    font-size: 14px; margin: 0; padding: 14px 18px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  section.panel .body { padding: 16px 18px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: 600; font-size: 11.5px; text-transform: uppercase; }
+  tr:last-child td { border-bottom: none; }
+  .provider-tag { font-size: 11px; padding: 2px 7px; border-radius: 5px; background: var(--gray-bg); color: var(--muted); }
+  .del-btn {
+    background: var(--red-bg); color: var(--red); border: none; border-radius: 6px;
+    padding: 5px 10px; font-size: 12px; cursor: pointer; font-weight: 600;
+  }
+  .del-btn:hover { opacity: .8; }
+  .wallet-form { display: flex; gap: 8px; align-items: center; }
+  .wallet-form input {
+    flex: 1; padding: 9px 12px; border: 1px solid var(--border); border-radius: 7px; font-size: 14px;
+  }
+  .wallet-form button, .refresh-btn {
+    background: var(--mint); color: #fff; border: none; border-radius: 7px;
+    padding: 9px 16px; font-size: 13px; font-weight: 600; cursor: pointer;
+  }
+  .wallet-form button:hover, .refresh-btn:hover { background: var(--mint-deep); }
+  .muted { color: var(--muted); }
+  .empty { text-align: center; padding: 24px; color: var(--muted); }
+
+  /* 토큰 게이트 */
+  #gate {
+    position: fixed; inset: 0; background: var(--dark);
+    display: flex; align-items: center; justify-content: center; flex-direction: column;
+    color: #fff; z-index: 10;
+  }
+  #gate .box { width: 300px; text-align: center; }
+  #gate h2 { margin: 0 0 4px; }
+  #gate p { color: #B9CFC6; font-size: 13px; margin: 0 0 20px; }
+  #gate input {
+    width: 100%; padding: 11px 14px; border-radius: 8px; border: none; font-size: 14px;
+    margin-bottom: 10px;
+  }
+  #gate button {
+    width: 100%; padding: 11px; border-radius: 8px; border: none; background: var(--mint);
+    color: #fff; font-weight: 700; cursor: pointer; font-size: 14px;
+  }
+  #gate .err { color: #FF8A8A; font-size: 12.5px; margin-top: 10px; min-height: 16px; }
+  #app { display: none; }
+</style>
+</head>
+<body>
+
+<div id="gate">
+  <div class="box">
+    <h2>🔒 트레빗 관리자</h2>
+    <p>ADMIN_TOKEN을 입력하세요</p>
+    <input id="tokenInput" type="password" placeholder="관리자 토큰" autofocus />
+    <button id="enterBtn">입장</button>
+    <div class="err" id="gateErr"></div>
+  </div>
+</div>
+
+<div id="app">
+  <header>
+    <div>
+      <h1>트레빗 <span>관리자</span></h1>
+      <div class="sub" id="uptimeText">-</div>
+    </div>
+    <button id="logoutBtn">토큰 지우기</button>
+  </header>
+
+  <main>
+    <div class="grid" id="statusGrid">
+      <div class="card"><h3>DB 연결</h3><div class="muted">불러오는 중…</div></div>
+    </div>
+
+    <section class="panel">
+      <h2>지갑(토큰) 조정<span></span></h2>
+      <div class="body">
+        <div class="row" style="margin-top:0"><span>현재 잔액</span><b id="walletCurrent">-</b></div>
+        <div class="wallet-form" style="margin-top:12px">
+          <input id="walletInput" type="number" min="0" placeholder="새 잔액 (예: 500000)" />
+          <button id="walletSetBtn">설정</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>가입자 목록 <button class="refresh-btn" id="userRefreshBtn" style="padding:4px 12px;font-size:12px">새로고침</button></h2>
+      <div class="body" style="padding:0">
+        <table>
+          <thead><tr><th>ID</th><th>이메일</th><th>닉네임</th><th>가입경로</th><th>가입일</th><th></th></tr></thead>
+          <tbody id="userTbody"></tbody>
+        </table>
+        <div class="empty" id="userEmpty" style="display:none">가입자가 없어요</div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script>
+const TOKEN_KEY = 'trevitAdminToken';
+let token = sessionStorage.getItem(TOKEN_KEY) || '';
+
+const gate = document.getElementById('gate');
+const app = document.getElementById('app');
+const gateErr = document.getElementById('gateErr');
+
+async function api(path, opts = {}) {
+  const res = await fetch(path, {
+    ...opts,
+    headers: { 'Content-Type': 'application/json', 'X-Admin-Token': token, ...(opts.headers || {}) },
+  });
+  if (res.status === 401 || res.status === 503) {
+    sessionStorage.removeItem(TOKEN_KEY);
+    token = '';
+    showGate((await res.json().catch(() => ({}))).message || '인증에 실패했어요.');
+    throw new Error('unauthorized');
+  }
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.message || ('요청 실패 (' + res.status + ')'));
+  }
+  return res.status === 204 ? null : res.json();
+}
+
+function showGate(err) {
+  gate.style.display = 'flex';
+  app.style.display = 'none';
+  gateErr.textContent = err || '';
+}
+
+function showApp() {
+  gate.style.display = 'none';
+  app.style.display = 'block';
+  loadStatus();
+  loadUsers();
+  setInterval(loadStatus, 10000);
+}
+
+document.getElementById('enterBtn').onclick = tryEnter;
+document.getElementById('tokenInput').addEventListener('keydown', e => { if (e.key === 'Enter') tryEnter(); });
+
+async function tryEnter() {
+  const v = document.getElementById('tokenInput').value.trim();
+  if (!v) return;
+  token = v;
+  try {
+    await api('/api/admin/status');
+    sessionStorage.setItem(TOKEN_KEY, token);
+    showApp();
+  } catch (e) {
+    // showGate 는 api() 안에서 401/503 일 때 이미 호출됨
+  }
+}
+
+document.getElementById('logoutBtn').onclick = () => {
+  sessionStorage.removeItem(TOKEN_KEY);
+  token = '';
+  location.reload();
+};
+
+function badge(up, offLabel) {
+  if (offLabel) return `<span class="badge off"><span class="dot"></span>${offLabel}</span>`;
+  return up
+    ? `<span class="badge up"><span class="dot"></span>정상</span>`
+    : `<span class="badge down"><span class="dot"></span>끊김</span>`;
+}
+
+function fmtUptime(sec) {
+  const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60);
+  return `가동 ${h}시간 ${m}분`;
+}
+
+async function loadStatus() {
+  let s;
+  try { s = await api('/api/admin/status'); } catch (e) { return; }
+
+  document.getElementById('uptimeText').textContent = fmtUptime(s.uptimeSeconds);
+  document.getElementById('walletCurrent').textContent = s.walletBalance.toLocaleString() + ' 토큰';
+
+  const ig = s.integrations;
+  const igRow = (label, on) =>
+    `<span class="badge ${on ? 'up' : 'off'}"><span class="dot"></span>${label}</span>`;
+
+  document.getElementById('statusGrid').innerHTML = `
+    <div class="card">
+      <h3>DB 연결</h3>
+      ${badge(s.db.up)}
+      <div class="row"><span>응답 시간</span><b>${s.db.latencyMs}ms</b></div>
+      <div class="row"><span>URL</span><b style="font-size:11px">${s.db.url}</b></div>
+    </div>
+    <div class="card">
+      <h3>LLM (LM Studio)</h3>
+      ${badge(s.llm.reachable, s.llm.enabled ? null : '꺼짐')}
+      <div class="row"><span>응답 시간</span><b>${s.llm.latencyMs}ms</b></div>
+      <div class="row"><span>모델</span><b style="font-size:11px">${s.llm.model}</b></div>
+    </div>
+    <div class="card">
+      <h3>외부 연동 설정</h3>
+      <div class="kv">
+        ${igRow('메일', ig.mail)}${igRow('구글', ig.google)}${igRow('TMAP', ig.tmap)}${igRow('ODsay', ig.odsay)}${igRow('공공데이터', ig.dataGoKr)}
+      </div>
+    </div>
+    <div class="card">
+      <h3>가입자 / 세션</h3>
+      <div class="big">${s.counts.users}</div>
+      <div class="row"><span>로그인 세션</span><b>${s.counts.authTokens}</b></div>
+      <div class="row"><span>인증 대기중</span><b>${s.counts.pendingEmailVerifications}</b></div>
+    </div>
+    <div class="card">
+      <h3>생성된 플랜</h3>
+      <div class="big">${s.plansGeneratedSinceStart}</div>
+      <div class="row"><span>서버 시작 이후</span><b>-</b></div>
+    </div>
+  `;
+}
+
+async function loadUsers() {
+  let users;
+  try { users = await api('/api/admin/users'); } catch (e) { return; }
+  const tbody = document.getElementById('userTbody');
+  const empty = document.getElementById('userEmpty');
+  if (!users.length) {
+    tbody.innerHTML = '';
+    empty.style.display = 'block';
+    return;
+  }
+  empty.style.display = 'none';
+  tbody.innerHTML = users.map(u => `
+    <tr>
+      <td>${u.id}</td>
+      <td>${escapeHtml(u.email)}</td>
+      <td>${escapeHtml(u.nickname)}</td>
+      <td><span class="provider-tag">${u.provider}</span></td>
+      <td class="muted" style="font-size:11.5px">${new Date(u.createdAt).toLocaleString('ko-KR')}</td>
+      <td><button class="del-btn" data-id="${u.id}">삭제</button></td>
+    </tr>
+  `).join('');
+  tbody.querySelectorAll('.del-btn').forEach(btn => {
+    btn.onclick = async () => {
+      if (!confirm(`유저 #${btn.dataset.id} 를 삭제할까요? 되돌릴 수 없어요.`)) return;
+      try {
+        await api('/api/admin/users/' + btn.dataset.id, { method: 'DELETE' });
+        loadUsers();
+        loadStatus();
+      } catch (e) { alert(e.message); }
+    };
+  });
+}
+
+document.getElementById('userRefreshBtn').onclick = loadUsers;
+
+document.getElementById('walletSetBtn').onclick = async () => {
+  const v = document.getElementById('walletInput').value;
+  if (v === '') return;
+  try {
+    await api('/api/admin/wallet', { method: 'POST', body: JSON.stringify({ balance: Number(v) }) });
+    document.getElementById('walletInput').value = '';
+    loadStatus();
+  } catch (e) { alert(e.message); }
+};
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+// 시작
+if (token) {
+  api('/api/admin/status').then(showApp).catch(() => {});
+} else {
+  showGate();
+}
+</script>
+</body>
+</html>

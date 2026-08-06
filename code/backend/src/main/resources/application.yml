@@ -69,3 +69,8 @@ lmstudio:
   enabled: ${LMSTUDIO_ENABLED:true}
   # AI 응답이 이 시간을 넘기면 휴리스틱 폴백 (느린 로컬 모델은 값을 늘릴 것)
   timeout-ms: ${LMSTUDIO_TIMEOUT_MS:20000}
+
+# 관리자 페이지(/admin) 접근 토큰. 비어 있으면(기본값) /api/admin/** 전체가 503으로 막힌다 —
+# 값을 넣어야만 켜지는 안전한 기본값이다. 절대 저장소에 실제 값을 커밋하지 말 것.
+admin:
+  token: ${ADMIN_TOKEN:}

@@ -253,6 +253,7 @@ class PlanService(
         // 토큰 차감 (1토큰 = 1원, 예상 총비용만큼 / 음수 방지)
         wallet.balance = maxOf(0, wallet.balance - totalCost)
         walletRepository.save(wallet)
+        AdminService.plansGenerated.incrementAndGet()
 
         return PlanResponse(
             budget, days, people, totalCost,
