@@ -10,7 +10,7 @@
 |---|---|---|
 | 프론트엔드 (웹) | Compose Multiplatform(wasm) — 안드로이드 앱과 같은 화면 코드 | 3000 |
 | 앱 (Android) | Jetpack Compose (`app-kmp/composeApp`, 웹과 코드 공유) | — |
-| 백엔드 API | Spring Boot 3 + JPA + H2 인메모리 DB | 8080 |
+| 백엔드 API | Spring Boot 3 + JPA + PostgreSQL | 8080 |
 | 지도 | Leaflet + OpenStreetMap 타일 (키 불필요) | — |
 | 도보 경로 | OSRM 공개 라우팅 서버 (키 불필요) | — |
 | 대중교통 | ODsay API (키 없으면 거리 기반 추정 자동 폴백) | — |

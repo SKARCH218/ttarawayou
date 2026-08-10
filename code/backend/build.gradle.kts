@@ -31,7 +31,7 @@ dependencies {
     // 회원가입 메일 인증 — SMTP가 설정돼 있을 때만 실제로 발송한다
     implementation("org.springframework.boot:spring-boot-starter-mail")
     implementation("org.jetbrains.kotlin:kotlin-reflect")
-    runtimeOnly("com.h2database:h2")
+    runtimeOnly("org.postgresql:postgresql")
     testImplementation("org.springframework.boot:spring-boot-starter-test")
 }
 
