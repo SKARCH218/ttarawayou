@@ -53,14 +53,7 @@ log "배포 시작: ${LOCAL:0:7} → ${REMOTE:0:7}"
 : > "$BUILD_LOG"
 git reset --hard "origin/$BRANCH" >>"$BUILD_LOG" 2>&1
 
-# 1) 웹(Compose wasm) 빌드 — 백엔드 jar 가 이 결과물을 static/ 으로 품는다
-cd "$REPO/code/app-kmp" || exit 1
-if ! ./gradlew :composeApp:wasmJsBrowserDistribution --console=plain >>"$BUILD_LOG" 2>&1; then
-  log "실패: 웹(wasm) 빌드 — 로그: $BUILD_LOG"
-  exit 1
-fi
-
-# 2) 백엔드 jar 빌드
+# 백엔드 jar 빌드
 cd "$REPO/code/backend" || exit 1
 if ! ./gradlew bootJar --console=plain >>"$BUILD_LOG" 2>&1; then
   log "실패: 백엔드 빌드 — 로그: $BUILD_LOG"
@@ -73,13 +66,13 @@ if [ -z "$NEWJAR" ]; then
   exit 1
 fi
 
-# 3) 원자적 교체 준비 — 같은 파티션 내 mv 는 순간적으로 끝나 무중단에 가깝다
+# 원자적 교체 준비 — 같은 파티션 내 mv 는 순간적으로 끝나 무중단에 가깝다
 mkdir -p "$RUNDIR"
 [ -f "$JAR" ] && cp "$JAR" "$JAR.bak"
 cp "$NEWJAR" "$JAR.new"
 mv "$JAR.new" "$JAR"
 
-# 4) 재시작 + 헬스체크 (최대 2분 대기)
+# 재시작 + 헬스체크 (최대 2분 대기)
 systemctl --user restart trevit
 OK=0
 for i in $(seq 1 24); do
