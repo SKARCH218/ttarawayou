@@ -54,7 +54,7 @@ import androidx.compose.ui.unit.sp
 import com.trevit.app.resources.*
 
 /**
- * 웹 데모(frontend/public/css/style.css)의 시각 규칙을 Compose로 옮긴 공용 컴포넌트.
+ * 디자인 시스템의 시각 규칙을 Compose로 옮긴 공용 컴포넌트.
  *
  * 수치·색은 전부 웹 CSS와 ogq-tokens.css 에서 그대로 가져왔다.
  * 화면 코드에서 새 값을 만들지 말고 여기 있는 것을 쓴다 — 두 쪽이 어긋나는 걸 막는 유일한 장치다.
