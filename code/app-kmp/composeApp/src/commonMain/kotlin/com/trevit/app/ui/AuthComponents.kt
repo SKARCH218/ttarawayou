@@ -67,7 +67,7 @@ fun AuthTextField(
             Modifier.padding(start = 16.dp, end = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Box(Modifier.weight(1f)) {
+            Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
                 if (value.isEmpty()) {
                     Text(
                         placeholder,
