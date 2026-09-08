@@ -26,6 +26,7 @@ class AiPlanService(
     @Value("\${lmstudio.enabled}") private val enabled: Boolean,
     @Value("\${lmstudio.timeout-ms:20000}") private val timeoutMs: Int,
     @Value("\${lmstudio.api-key:}") private val apiKey: String,
+    @Value("\${lmstudio.max-tokens:4000}") private val maxTokens: Int,
 ) {
 
     private val log = LoggerFactory.getLogger(AiPlanService::class.java)
@@ -177,8 +178,9 @@ class AiPlanService(
         val body = mapOf(
             "model" to model,
             "temperature" to 0.3,
-            // 추론(reasoning) 모델은 '생각'에도 토큰을 쓰므로 제한하지 않는다 (LM Studio: -1 = 무제한)
-            "max_tokens" to -1,
+            // 실측 결과 이 추론 모델은 -1(무제한)로 두면 '생각'에만 13793/13796 토큰을 써서
+            // 5분을 줘도 응답을 못 끝냈다. 상한을 걸어 강제로 답을 내게 한다.
+            "max_tokens" to maxTokens,
             "messages" to listOf(
                 mapOf("role" to "system", "content" to "너는 대한민국 여행 플래너다. 요청받은 JSON 형식으로만 답한다."),
                 mapOf("role" to "user", "content" to userPrompt),

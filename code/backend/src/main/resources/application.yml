@@ -75,6 +75,9 @@ lmstudio:
   # LM Studio 서버의 "Require API key" 설정을 켰다면 여기에 그 토큰을 넣는다.
   # 비어 있으면 Authorization 헤더를 아예 보내지 않는다 (기존과 동일하게 동작).
   api-key: ${LMSTUDIO_API_KEY:}
+  # 추론(reasoning) 모델이 생각에만 토큰을 다 써버려 응답을 못 끝내는 걸 방지하는 상한선.
+  # 실측: reasoning_tokens가 13793/13796으로 거의 전부를 차지해 5분을 줘도 응답이 안 끝났다.
+  max-tokens: ${LMSTUDIO_MAX_TOKENS:4000}
 
 # 관리자 페이지(/admin) 접근 토큰. 비어 있으면(기본값) /api/admin/** 전체가 503으로 막힌다 —
 # 값을 넣어야만 켜지는 안전한 기본값이다. 절대 저장소에 실제 값을 커밋하지 말 것.
