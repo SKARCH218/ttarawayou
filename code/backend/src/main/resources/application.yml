@@ -72,6 +72,9 @@ lmstudio:
   enabled: ${LMSTUDIO_ENABLED:true}
   # AI 응답이 이 시간을 넘기면 휴리스틱 폴백 (느린 로컬 모델은 값을 늘릴 것)
   timeout-ms: ${LMSTUDIO_TIMEOUT_MS:20000}
+  # LM Studio 서버의 "Require API key" 설정을 켰다면 여기에 그 토큰을 넣는다.
+  # 비어 있으면 Authorization 헤더를 아예 보내지 않는다 (기존과 동일하게 동작).
+  api-key: ${LMSTUDIO_API_KEY:}
 
 # 관리자 페이지(/admin) 접근 토큰. 비어 있으면(기본값) /api/admin/** 전체가 503으로 막힌다 —
 # 값을 넣어야만 켜지는 안전한 기본값이다. 절대 저장소에 실제 값을 커밋하지 말 것.

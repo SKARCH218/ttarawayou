@@ -25,6 +25,7 @@ class AiPlanService(
     @Value("\${lmstudio.model}") private val model: String,
     @Value("\${lmstudio.enabled}") private val enabled: Boolean,
     @Value("\${lmstudio.timeout-ms:20000}") private val timeoutMs: Int,
+    @Value("\${lmstudio.api-key:}") private val apiKey: String,
 ) {
 
     private val log = LoggerFactory.getLogger(AiPlanService::class.java)
@@ -190,6 +191,10 @@ class AiPlanService(
             .uri(URI.create("$baseUrl/chat/completions"))
             .contentType(MediaType.APPLICATION_JSON)
             .accept(MediaType.APPLICATION_JSON)
+            .apply {
+                // LM Studio 서버의 "Require API key"가 켜져 있으면 토큰 없이는 401이 난다.
+                if (apiKey.isNotBlank()) header("Authorization", "Bearer $apiKey")
+            }
             .body(mapper.writeValueAsString(body))
             .retrieve()
             .body(ByteArray::class.java)
