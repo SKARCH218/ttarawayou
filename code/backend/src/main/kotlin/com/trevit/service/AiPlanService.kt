@@ -190,7 +190,10 @@ class AiPlanService(
         val res = http.post()
             .uri(URI.create("$baseUrl/chat/completions"))
             .contentType(MediaType.APPLICATION_JSON)
-            .accept(MediaType.APPLICATION_JSON)
+            // LM Studio가 이따금 Content-Type을 application/octet-stream으로 내려줄 때가 있어
+            // application/json만 명시하면 컨버터를 못 찾고 실패한다. 어차피 바이트로 받아 직접
+            // JSON 파싱을 하므로 응답 타입을 가리지 않는다.
+            .accept(MediaType.ALL)
             .apply {
                 // LM Studio 서버의 "Require API key"가 켜져 있으면 토큰 없이는 401이 난다.
                 if (apiKey.isNotBlank()) header("Authorization", "Bearer $apiKey")
