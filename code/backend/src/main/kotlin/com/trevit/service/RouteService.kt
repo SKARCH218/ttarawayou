@@ -230,15 +230,17 @@ class RouteService(
                 alightLng = sub.path("endX").asDouble()
             }
             val lane = sub.path("lane").get(0)
-            var busNo = ""
+            var laneName = ""
             val stationCount = sub.path("stationCount").asInt(0)
             if (lane != null) {
-                busNo = lane.path("busNo").asText(lane.path("name").asText("")).trim()
+                laneName = lane.path("busNo").asText(lane.path("name").asText("")).trim()
             }
-            // 시외 이동에서는 기차 등 번호 없는 구간이 올 수 있다
-            val rideName = if (busNo.isEmpty()) {
-                if (trafficType == 1) "지하철" else "시외 이동(열차/버스)"
-            } else "${busNo}번 버스"
+            // 교통수단별 표기: 지하철은 노선명 그대로, 버스만 "번 버스", 그 외(기차 등)는 노선명/시외 이동
+            val rideName = when (trafficType) {
+                1 -> if (laneName.isNotEmpty()) laneName else "지하철"          // 지하철
+                2 -> if (laneName.isNotEmpty()) "${laneName}번 버스" else "버스" // 버스
+                else -> if (laneName.isNotEmpty()) laneName else "시외 이동(열차/버스)"
+            }
             parts.add(
                 "$rideName ($startName 승차 → $endName 하차" +
                     (if (stationCount > 0) ", ${stationCount}개 정류장" else "") + ")"
@@ -261,9 +263,9 @@ class RouteService(
             ))
             // 1순위: 공공데이터포털(TAGO) 버스노선의 실제 경유 정류소 구간
             var segment: List<DoubleArray>? = null
-            if (trafficType == 2 && busNo.isNotEmpty()) {
+            if (trafficType == 2 && laneName.isNotEmpty()) {
                 segment = publicBusService.stationsBetween(
-                    busNo,
+                    laneName,
                     sub.path("startY").asDouble(), sub.path("startX").asDouble(),
                     sub.path("endY").asDouble(), sub.path("endX").asDouble(),
                 )

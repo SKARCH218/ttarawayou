@@ -12,6 +12,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.scaleIn
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -37,6 +38,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableDoubleStateOf
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -48,9 +50,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.rememberTextMeasurer
@@ -58,22 +62,32 @@ import org.jetbrains.compose.resources.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.trevit.app.AppState
 import com.trevit.app.resources.*
 import com.trevit.app.Screen
-import com.trevit.app.map.GeoProjector
 import com.trevit.app.map.LegGeometry
+import com.trevit.app.map.MapCamera
+import com.trevit.app.map.TILE_SIZE
+import com.trevit.app.map.TileKey
 import com.trevit.app.map.stopEmoji
 import com.trevit.app.map.stopTypeLabel
 import com.trevit.app.oneDecimal
 import com.trevit.app.won
 import com.trevit.shared.StopDto
+import com.trevit.shared.TileFetcher
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import org.jetbrains.compose.resources.ExperimentalResourceApi
+import org.jetbrains.compose.resources.decodeToImageBitmap
 import kotlin.math.PI
 import kotlin.math.ceil
 import kotlin.math.min
+import kotlin.math.roundToInt
 import kotlin.math.sin
 import kotlin.random.Random
 import kotlin.time.DurationUnit
@@ -150,6 +164,35 @@ fun JourneyScreen(state: AppState, dayIndex: Int) {
         .toInt().coerceAtLeast(if (remainMeters > 30) 1 else 0)
     val nextStop = stops.getOrNull(legIndex + 1)
 
+    // 대중교통 구간은 지하철/버스 세부 단계로 쪼개져 있다.
+    // 전체 환승 경로를 한꺼번에 보여주지 않고, 현재 위치가 속한 "타는 구간" 하나만 안내한다.
+    val transitSegments = if (currentLeg.mode == "TRANSIT") {
+        currentLeg.steps.orEmpty().filter { it.kind == "BUS" && !it.description.isNullOrBlank() }
+    } else emptyList()
+    // "버스 위치"(구간 거리 누적) 공간에서의 현재 위치
+    val transitTotalDist = transitSegments.sumOf { it.distanceMeters }.coerceAtLeast(1.0)
+    val transitTargetDist = (distOnLeg / currentGeom.lengthMeters).coerceIn(0.0, 1.0) * transitTotalDist
+    val currentSegIndex = if (transitSegments.isNotEmpty()) {
+        var acc = 0.0
+        var idx = transitSegments.lastIndex
+        for (i in transitSegments.indices) {
+            acc += transitSegments[i].distanceMeters
+            if (transitTargetDist <= acc + 1e-6) { idx = i; break }
+        }
+        idx
+    } else -1
+
+    // 현재 타는 구간에서 하차까지 남은 정거장 수 (설명의 "N개 정류장" + 구간 내 진행률로 추정)
+    val remainingStops = if (currentSegIndex >= 0) {
+        val seg = transitSegments[currentSegIndex]
+        val startOfCur = transitSegments.take(currentSegIndex).sumOf { it.distanceMeters }
+        val segDist = seg.distanceMeters.coerceAtLeast(1.0)
+        val progress = ((transitTargetDist - startOfCur) / segDist).coerceIn(0.0, 1.0)
+        val totalStops = Regex("(\\d+)개 정류장").find(seg.description ?: "")
+            ?.groupValues?.getOrNull(1)?.toIntOrNull() ?: 0
+        if (totalStops > 0) ceil(totalStops * (1.0 - progress)).toInt().coerceAtLeast(0) else -1
+    } else -1
+
     Box(Modifier.fillMaxSize()) {
         // ================= Canvas 지도 =================
         JourneyMap(
@@ -200,14 +243,32 @@ fun JourneyScreen(state: AppState, dayIndex: Int) {
 
             if (currentLeg.mode == "TRANSIT") {
                 Spacer(Modifier.height(8.dp))
-                MapPill(
+                // 현재 타고 있는 구간 하나만 표시 (여러 구간이면 [현재/전체] 표시)
+                val segLabel = if (currentSegIndex >= 0) {
+                    val n = transitSegments.size
+                    val prefix = if (n > 1) "[${currentSegIndex + 1}/$n] " else ""
+                    prefix + (transitSegments[currentSegIndex].description ?: "")
+                } else {
                     currentLeg.summary
-                        ?: "${currentLeg.boardStop ?: "정류장"} 승차 → ${currentLeg.alightStop ?: "정류장"} 하차",
+                        ?: "${currentLeg.boardStop ?: "정류장"} 승차 → ${currentLeg.alightStop ?: "정류장"} 하차"
+                }
+                MapPill(
+                    segLabel,
                     Modifier
                         .align(Alignment.CenterHorizontally)
                         .padding(horizontal = 16.dp),
                     color = WebOrangeDark,
                 )
+                // 하차까지 남은 정거장 수
+                if (remainingStops >= 0) {
+                    Spacer(Modifier.height(6.dp))
+                    MapPill(
+                        if (remainingStops == 0) "이번 정거장에서 하차하세요"
+                        else "하차까지 ${remainingStops}정거장",
+                        Modifier.align(Alignment.CenterHorizontally),
+                        color = WebOrangeDark,
+                    )
+                }
             }
 
             Spacer(Modifier.weight(1f))
@@ -267,6 +328,10 @@ fun JourneyScreen(state: AppState, dayIndex: Int) {
 // ---------------------------------------------------------------------------
 // Canvas 지도
 // ---------------------------------------------------------------------------
+private const val MAP_ZOOM = 19       // 고정 줌 — 확대/축소 제스처 없음 (미스터리 지도 규칙)
+private const val MAP_TILE_SCALE = 2.6f // 타일 렌더 배율 (클수록 더 확대되어 보임)
+
+@OptIn(ExperimentalResourceApi::class)
 @Composable
 private fun JourneyMap(
     geoms: List<LegGeometry>,
@@ -276,6 +341,7 @@ private fun JourneyMap(
     revealedCount: Int,
 ) {
     val colorScheme = MaterialTheme.colorScheme
+    val darkMap = isSystemInDarkTheme()
     val pulse by rememberInfiniteTransition(label = "pulse").animateFloat(
         0f, 1f,
         infiniteRepeatable(tween(1400, easing = LinearEasing)),
@@ -285,14 +351,49 @@ private fun JourneyMap(
     val textMeasurer = rememberTextMeasurer()
     val tossFace = TossFaceFontFamily
 
-    Canvas(Modifier.fillMaxSize()) {
-        val allPoints = buildList {
-            geoms.forEach { addAll(it.points) }
-            stops.forEach { add(it.latitude to it.longitude) }
-        }
-        val projector = GeoProjector(allPoints, size.width, size.height, 90f)
+    // ---- 내비게이션 카메라: 사용자 현재 위치가 항상 화면 중앙 ----
+    val (curLat, curLng) = geoms[legIndex].positionAt(distOnLeg)
 
-        // 배경 그리드 (지도 느낌)
+    // ---- OSM 타일 로딩 (실패한 타일은 다음 이동 때 재시도, 그동안은 격자 배경) ----
+    var canvasSize by remember { mutableStateOf(IntSize.Zero) }
+    val tiles = remember { mutableStateMapOf<TileKey, ImageBitmap>() }
+    val pendingTiles = remember { mutableSetOf<TileKey>() }
+    val visibleTiles = remember(canvasSize, curLat, curLng) {
+        if (canvasSize == IntSize.Zero) emptyList()
+        else MapCamera(
+            curLat, curLng, MAP_ZOOM, MAP_TILE_SCALE,
+            canvasSize.width.toFloat(), canvasSize.height.toFloat(),
+        ).visibleTiles()
+    }
+    LaunchedEffect(visibleTiles) {
+        visibleTiles.forEach { key ->
+            if (key !in tiles && pendingTiles.add(key)) {
+                launch(Dispatchers.Default) {
+                    runCatching { TileFetcher.fetch(key.z, key.x, key.y, darkMap) }
+                        .onSuccess { bytes ->
+                            runCatching { tiles[key] = bytes.decodeToImageBitmap() }
+                        }
+                    pendingTiles.remove(key)
+                }
+            }
+        }
+        // 캐시 상한 — 화면 밖 타일부터 정리
+        if (tiles.size > 140) {
+            val keep = visibleTiles.toSet()
+            tiles.keys.filterNot { it in keep }.take(tiles.size - 100)
+                .forEach { tiles.remove(it) }
+        }
+    }
+
+    Canvas(
+        Modifier
+            .fillMaxSize()
+            .onSizeChanged { canvasSize = it },
+    ) {
+        val camera = MapCamera(curLat, curLng, MAP_ZOOM, MAP_TILE_SCALE, size.width, size.height)
+
+        // 배경 그리드 — 타일이 아직 없을 때의 폴백 (오프라인에서도 경로는 보이게)
+        drawRect(colorScheme.background)
         val gridColor = colorScheme.onSurface.copy(alpha = 0.05f)
         var gx = 0f
         while (gx < size.width) {
@@ -305,6 +406,25 @@ private fun JourneyMap(
             gy += 56f
         }
 
+        // OSM 타일 (+1px 겹침으로 반올림 이음새 제거)
+        val tilePx = (TILE_SIZE * MAP_TILE_SCALE).roundToInt() + 1
+        camera.visibleTiles().forEach { key ->
+            val img = tiles[key] ?: return@forEach
+            val tl = camera.tileTopLeft(key.x, key.y)
+            drawImage(
+                img,
+                dstOffset = IntOffset(tl.x.roundToInt(), tl.y.roundToInt()),
+                dstSize = IntSize(tilePx, tilePx),
+            )
+        }
+        // 지도 간략화 — 타일 위에 옅은 막을 씌워 상점·POI 색을 가라앉힌다 (경로·정류장 마커 강조)
+        if (tiles.isNotEmpty()) {
+            drawRect(
+                if (darkMap) Color(0xFF10191B).copy(alpha = 0.68f)
+                else Color.White.copy(alpha = 0.72f),
+            )
+        }
+
         fun drawGeoPath(
             pts: List<Pair<Double, Double>>,
             color: Color,
@@ -314,7 +434,7 @@ private fun JourneyMap(
             if (pts.size < 2) return
             val path = Path()
             pts.forEachIndexed { i, (lat, lng) ->
-                val o = projector.toOffset(lat, lng)
+                val o = camera.toOffset(lat, lng)
                 if (i == 0) path.moveTo(o.x, o.y) else path.lineTo(o.x, o.y)
             }
             drawPath(
@@ -330,10 +450,8 @@ private fun JourneyMap(
             )
         }
 
-        // 남은 경로 — 웹 map.js 와 같은 보라색 ("보라색 길을 따라가세요")
-        for (i in legIndex + 1 until geoms.size) {
-            drawGeoPath(geoms[i].points, MysteryPurple, 9f)
-        }
+        // 현재 향하는 장소로 가는 길만 그린다 (미래·과거 구간은 숨김).
+        // 현재 구간의 남은 길(보라색) + 지나온 길(회색 점선)만 표시.
         val current = geoms[legIndex]
         val traveledPts = current.subPathTo(distOnLeg)
         val remainingPts = buildList {
@@ -343,31 +461,45 @@ private fun JourneyMap(
             for (j in idx until current.points.size) add(current.points[j])
         }
         drawGeoPath(remainingPts, MysteryPurple, 9f)
-
-        // 지나온 경로 (회색 점선)
-        for (i in 0 until legIndex) {
-            drawGeoPath(geoms[i].points, colorScheme.outline.copy(alpha = 0.65f), 6f, dashed = true)
-        }
         drawGeoPath(traveledPts, colorScheme.outline.copy(alpha = 0.65f), 6f, dashed = true)
 
-        // 승차/하차 정류장 마커 (대중교통 구간)
-        val leg = current.leg
-        if (leg.mode == "TRANSIT") {
+        // 버스 정류장 마커 — 현재 구간이 대중교통일 때만, 그 구간의 정류장만 표시
+        run {
+            val lg = current.leg
+            if (lg.mode != "TRANSIT") return@run
+            // 경유 정류장 (작은 주황 점)
+            lg.stations?.forEach { st ->
+                if (st.size >= 2) {
+                    val o = camera.toOffset(st[0], st[1])
+                    drawCircle(WebOrangeDark, 5f, o)
+                    drawCircle(Color.White, 5f, o, style = Stroke(2f))
+                }
+            }
+            // 승차·하차 정류장 (흰 원 + 주황 테두리 + 🚏)
             listOf(
-                leg.boardLat to leg.boardLng,
-                leg.alightLat to leg.alightLng,
+                lg.boardLat to lg.boardLng,
+                lg.alightLat to lg.alightLng,
             ).forEach { (la, ln) ->
                 if (la != null && ln != null) {
-                    val o = projector.toOffset(la, ln)
-                    drawCircle(colorScheme.secondary, 11f, o)
-                    drawCircle(colorScheme.surface, 5f, o)
+                    val o = camera.toOffset(la, ln)
+                    drawCircle(Color.White, 15f, o)
+                    drawCircle(WebOrangeDark, 15f, o, style = Stroke(3.5f))
+                    val layout = textMeasurer.measure(
+                        "🚏",
+                        style = TextStyle(fontSize = 17f.toSp(), fontFamily = tossFace),
+                    )
+                    drawText(
+                        layout,
+                        topLeft = Offset(o.x - layout.size.width / 2f, o.y - layout.size.height / 2f),
+                    )
                 }
             }
         }
 
-        // 정차 지점 마커
+        // 정차 지점 마커 — 현재 구간의 출발지(legIndex)와 목표 장소(legIndex+1)만 표시
         stops.forEachIndexed { i, stop ->
-            val o = projector.toOffset(stop.latitude, stop.longitude)
+            if (i != legIndex && i != legIndex + 1) return@forEachIndexed
+            val o = camera.toOffset(stop.latitude, stop.longitude)
             val revealed = i < revealedCount
             if (revealed) {
                 drawCircle(colorScheme.secondaryContainer, 26f, o)
@@ -398,9 +530,8 @@ private fun JourneyMap(
             }
         }
 
-        // 현재 위치 마커 (펄스)
-        val (curLat, curLng) = current.positionAt(distOnLeg)
-        val curOffset = projector.toOffset(curLat, curLng)
+        // 현재 위치 마커 (펄스) — 카메라가 사용자를 따라가므로 항상 화면 정중앙
+        val curOffset = camera.toOffset(curLat, curLng)
         // 웹 `.user-marker` — 민트 점에 흰 테두리와 옅은 후광
         drawCircle(
             WebMint.copy(alpha = (1f - pulse) * 0.35f),
@@ -409,6 +540,19 @@ private fun JourneyMap(
         )
         drawCircle(WebMint, 14f, curOffset)
         drawCircle(Color.White, 14f, curOffset, style = Stroke(4f))
+
+        // OSM 저작자 표시 (타일 사용 요건)
+        val attribution = textMeasurer.measure(
+            "© OpenStreetMap",
+            style = TextStyle(fontSize = 9.sp, color = colorScheme.onSurfaceVariant.copy(alpha = 0.75f)),
+        )
+        drawText(
+            attribution,
+            topLeft = Offset(
+                size.width - attribution.size.width - 10f,
+                size.height - attribution.size.height - 8f,
+            ),
+        )
     }
 }
 

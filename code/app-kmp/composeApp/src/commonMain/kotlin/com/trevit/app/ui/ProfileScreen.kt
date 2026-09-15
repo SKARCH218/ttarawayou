@@ -28,14 +28,18 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.SolidColor
@@ -65,15 +69,7 @@ private const val AUTO_ADVANCE_DELAY_MS = 180L
  */
 @Composable
 fun ProfileScreen(state: AppState) {
-    // 선택 → 짧은 딜레이 → 자동 다음. 토큰을 증가시켜 매번 다시 트리거한다.
-    var advanceToken by remember { mutableIntStateOf(0) }
-    LaunchedEffect(advanceToken) {
-        if (advanceToken == 0) return@LaunchedEffect
-        delay(AUTO_ADVANCE_DELAY_MS)
-        state.nextQuestion()
-    }
-    val autoAdvance = { advanceToken++ }
-
+    // 모든 질문을 [다음] 버튼으로 통일 — 선택해도 자동으로 넘어가지 않는다.
     Column(
         Modifier
             .fillMaxSize()
@@ -112,11 +108,12 @@ fun ProfileScreen(state: AppState) {
             val question = ProfileQuestion.ordered[index]
             QuestionPage(question) {
                 when (question) {
-                    ProfileQuestion.Purpose -> SingleChoice(
+                    ProfileQuestion.Purpose -> SingleChoiceCustom(
                         options = PURPOSES,
                         selected = state.purpose,
-                        wide = question.wide,
-                        onSelect = { state.purpose = it; autoAdvance() },
+                        onSelectPreset = { state.purpose = it },
+                        onCustomChange = { state.purpose = it.ifBlank { null } },
+                        customPlaceholder = "원하는 여행 유형을 입력하세요",
                     )
 
                     ProfileQuestion.Gender -> SingleChoice(
@@ -130,7 +127,6 @@ fun ProfileScreen(state: AppState) {
                         onSelect = { option ->
                             state.gender = option.takeIf { it != "선택 안 함" }
                             state.genderNotSpecified = option == "선택 안 함"
-                            autoAdvance()
                         },
                     )
 
@@ -138,22 +134,24 @@ fun ProfileScreen(state: AppState) {
                         options = AGE_GROUPS,
                         selected = state.ageGroup,
                         wide = question.wide,
-                        onSelect = { state.ageGroup = it; autoAdvance() },
+                        onSelect = { state.ageGroup = it },
                     )
 
                     ProfileQuestion.Mbti -> MbtiChoice(state)
 
-                    ProfileQuestion.Food -> SingleChoice(
+                    ProfileQuestion.Food -> SingleChoiceCustom(
                         options = FOOD_PREFS,
                         selected = state.foodPreference,
-                        wide = question.wide,
-                        onSelect = { state.foodPreference = it; autoAdvance() },
+                        onSelectPreset = { state.foodPreference = it },
+                        onCustomChange = { state.foodPreference = it.ifBlank { null } },
+                        customPlaceholder = "좋아하는 음식을 입력하세요",
                     )
 
-                    ProfileQuestion.Places -> MultiChoice(
+                    ProfileQuestion.Places -> MultiChoiceCustom(
                         options = KEYWORD_OPTIONS,
                         selected = state.keywords,
                         onToggle = state::toggleKeyword,
+                        customPlaceholder = "가고 싶은 곳을 입력하세요",
                     )
 
                     ProfileQuestion.Walking -> SingleChoice(
@@ -164,7 +162,6 @@ fun ProfileScreen(state: AppState) {
                         onSelect = { option ->
                             state.avoidWalking = option == WALKING_OPTIONS[1]
                             state.walkingAnswered = true
-                            autoAdvance()
                         },
                     )
 
@@ -186,6 +183,20 @@ private fun QuestionNav(state: AppState) {
     val question = state.question
     val last = state.questionIndex == state.questionCount - 1
 
+    // 일정 제작에 꼭 필요한 질문 — 하나라도 선택해야 다음으로 넘어갈 수 있다
+    val required = question == ProfileQuestion.Purpose ||
+        question == ProfileQuestion.Gender ||
+        question == ProfileQuestion.AgeGroup ||
+        question == ProfileQuestion.Food ||
+        question == ProfileQuestion.Walking
+    val answered = when (question) {
+        ProfileQuestion.Purpose -> state.purpose != null
+        ProfileQuestion.Gender -> state.gender != null || state.genderNotSpecified
+        ProfileQuestion.AgeGroup -> state.ageGroup != null
+        ProfileQuestion.Food -> state.foodPreference != null
+        ProfileQuestion.Walking -> state.walkingAnswered
+        else -> true
+    }
     Column(Modifier.navigationBarsPadding()) {
         Spacer(Modifier.height(14.dp))
         Row(
@@ -197,35 +208,12 @@ private fun QuestionNav(state: AppState) {
                 text = if (state.questionIndex == 0) "설정" else "이전",
                 onClick = { state.previousQuestion() },
             )
-            if (!question.autoAdvance) {
-                PrimaryCta(
-                    text = if (last) "플랜 만들기" else "다음",
-                    onClick = { state.nextQuestion() },
-                    modifier = Modifier.weight(1f),
-                )
-            }
-        }
-        if (!question.autoAdvance) {
-            // 웹 `.ask-skip` — 밑줄 친 회색 글자, 가운데
-            val interaction = remember { MutableInteractionSource() }
-            Text(
-                "건너뛰기",
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable(interactionSource = interaction, indication = null) {
-                        when (question) {
-                            ProfileQuestion.Places -> state.keywords.clear()
-                            ProfileQuestion.Note -> state.preferenceNote = ""
-                            else -> Unit
-                        }
-                        state.nextQuestion()
-                    }
-                    .padding(10.dp),
-                fontSize = 13.5.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = webTextDim(),
-                textDecoration = TextDecoration.Underline,
-                textAlign = TextAlign.Center,
+            // 모든 질문에 [다음] 버튼. 필수 질문은 선택 전엔 비활성.
+            PrimaryCta(
+                text = if (last) "플랜 만들기" else "다음",
+                enabled = !required || answered,
+                onClick = { state.nextQuestion() },
+                modifier = Modifier.weight(1f),
             )
         }
     }
@@ -303,6 +291,7 @@ private fun SingleChoice(
             Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(9.dp, Alignment.CenterHorizontally),
             verticalArrangement = Arrangement.spacedBy(9.dp),
+            maxItemsInEachRow = 4,
         ) {
             options.forEach { option ->
                 WebChip(option, selected == option, { onSelect(option) })
@@ -322,10 +311,145 @@ private fun MultiChoice(
         Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(9.dp, Alignment.CenterHorizontally),
         verticalArrangement = Arrangement.spacedBy(9.dp),
+        maxItemsInEachRow = 4,
     ) {
         options.forEach { option ->
             WebChip(option, option in selected, { onToggle(option) })
         }
+    }
+}
+
+/**
+ * 단일 선택 + "기타" 직접 입력. 프리셋을 고르면 기존처럼 자동으로 다음으로 넘어가고,
+ * "기타"를 고르면 입력창이 열려 원하는 값을 직접 적은 뒤 [다음]으로 넘어간다.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun SingleChoiceCustom(
+    options: List<String>,
+    selected: String?,
+    onSelectPreset: (String) -> Unit,
+    onCustomChange: (String) -> Unit,
+    customPlaceholder: String,
+) {
+    // 선택값이 프리셋에 없으면(=사용자 입력) 기타 모드로 본다
+    var customMode by remember { mutableStateOf(selected != null && selected !in options) }
+    Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+        FlowRow(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(9.dp, Alignment.CenterHorizontally),
+            verticalArrangement = Arrangement.spacedBy(9.dp),
+            maxItemsInEachRow = 4,
+        ) {
+            options.forEach { option ->
+                WebChip(option, !customMode && selected == option, {
+                    customMode = false
+                    onSelectPreset(option)
+                })
+            }
+            WebChip("기타", customMode, {
+                customMode = true
+                if (selected == null || selected in options) onCustomChange("")
+            })
+        }
+        if (customMode) {
+            Spacer(Modifier.height(12.dp))
+            // 입력만 받고, 진행은 하단 공통 [다음] 버튼으로 통일
+            CustomInputField(
+                value = if (selected != null && selected !in options) selected else "",
+                onValueChange = onCustomChange,
+                placeholder = customPlaceholder,
+                onSubmit = {},
+            )
+        }
+    }
+}
+
+/**
+ * 다중 선택 + "기타" 직접 입력. "기타"를 누르면 입력창이 열리고, 적은 값을 추가하면
+ * 선택된 칩으로 나타난다(칩을 다시 누르면 제거). 프리셋과 섞어서 여러 개 고를 수 있다.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun MultiChoiceCustom(
+    options: List<String>,
+    selected: List<String>,
+    onToggle: (String) -> Unit,
+    customPlaceholder: String,
+) {
+    var addMode by remember { mutableStateOf(false) }
+    var draft by remember { mutableStateOf("") }
+    val customSelected = selected.filter { it !in options }
+    val addCustom = {
+        val t = draft.trim()
+        if (t.isNotEmpty() && t !in selected && t !in options) {
+            onToggle(t)
+            draft = ""
+        }
+    }
+    Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+        FlowRow(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(9.dp, Alignment.CenterHorizontally),
+            verticalArrangement = Arrangement.spacedBy(9.dp),
+            maxItemsInEachRow = 4,
+        ) {
+            options.forEach { option ->
+                WebChip(option, option in selected, { onToggle(option) })
+            }
+            // 사용자가 직접 추가한 항목 (누르면 제거)
+            customSelected.forEach { item ->
+                WebChip(item, true, { onToggle(item) })
+            }
+            WebChip("기타", addMode, { addMode = !addMode })
+        }
+        if (addMode) {
+            Spacer(Modifier.height(12.dp))
+            CustomInputField(
+                value = draft,
+                onValueChange = { draft = it },
+                placeholder = customPlaceholder,
+                onSubmit = addCustom,
+            )
+            Spacer(Modifier.height(10.dp))
+            PrimaryCta(
+                text = "추가",
+                enabled = draft.isNotBlank(),
+                onClick = addCustom,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+    }
+}
+
+/** "기타" 선택 시 나타나는 직접 입력창 (엔터/완료로 제출) */
+@Composable
+private fun CustomInputField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    placeholder: String,
+    onSubmit: () -> Unit,
+) {
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .border(1.5.dp, webBorderStrong(), RoundedCornerShape(12.dp))
+            .background(webFill(), RoundedCornerShape(12.dp))
+            .padding(horizontal = 14.dp, vertical = 13.dp),
+    ) {
+        if (value.isEmpty()) {
+            Text(placeholder, fontSize = 14.5.sp, color = webTextDim())
+        }
+        BasicTextField(
+            value = value,
+            onValueChange = { if (it.length <= 40) onValueChange(it) },
+            singleLine = true,
+            textStyle = TextStyle(fontSize = 14.5.sp, color = webText()),
+            cursorBrush = SolidColor(WebMint),
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+            keyboardActions = KeyboardActions(onDone = { onSubmit() }),
+            modifier = Modifier.fillMaxWidth(),
+        )
     }
 }
 

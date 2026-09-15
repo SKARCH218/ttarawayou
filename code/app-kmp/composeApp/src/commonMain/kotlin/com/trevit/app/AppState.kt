@@ -5,6 +5,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import com.trevit.app.map.getCurrentLocation
 import com.trevit.shared.PlanRepository
 import com.trevit.shared.PlanRequest
 import com.trevit.shared.PlanResponse
@@ -37,18 +38,18 @@ sealed interface Screen {
 enum class ProfileQuestion(
     val emoji: String,
     val title: String,
-    val autoAdvance: Boolean,
+    // 모든 질문을 [다음] 버튼으로 통일 — 선택 즉시 넘어가지 않는다
     val hint: String? = null,
     val wide: Boolean = false,
 ) {
-    Purpose("🧭", "어떤 여행을 원하세요?", true),
-    Gender("🙂", "성별을 알려주세요", true, "취향이 비슷한 여행자의 코스를 참고해요", wide = true),
-    AgeGroup("🎂", "연령대는 어떻게 되세요?", true),
-    Mbti("🧩", "MBTI를 알려주세요", false, "모르면 건너뛰어도 괜찮아요"),
-    Food("🍚", "어떤 음식을 좋아하세요?", true),
-    Places("🏞️", "어떤 곳에 가고 싶으세요?", false, "여러 개 고를 수 있어요"),
-    Walking("🚶", "많이 걷는 건 괜찮으세요?", true, wide = true),
-    Note("💬", "더 알려주실 취향이 있나요?", false, "AI가 장소를 고를 때 참고해요"),
+    Purpose("🧭", "어떤 여행을 원하세요?"),
+    Gender("🙂", "성별을 알려주세요", "취향이 비슷한 여행자의 코스를 참고해요", wide = true),
+    AgeGroup("🎂", "연령대는 어떻게 되세요?"),
+    Mbti("🧩", "MBTI를 알려주세요", "모르면 건너뛰어도 괜찮아요"),
+    Food("🍚", "어떤 음식을 좋아하세요?"),
+    Places("🏞️", "어떤 곳에 가고 싶으세요?", "여러 개 고를 수 있어요"),
+    Walking("🚶", "많이 걷는 건 괜찮으세요?", wide = true),
+    Note("💬", "더 알려주실 취향이 있나요?", "AI가 장소를 고를 때 참고해요"),
     ;
 
     companion object {
@@ -251,7 +252,7 @@ class AppState(
         if (!keywords.remove(keyword)) keywords.add(keyword)
     }
 
-    private fun buildRequest() = PlanRequest(
+    private fun buildRequest(startLat: Double? = null, startLng: Double? = null) = PlanRequest(
         budget = budget,
         days = days,
         people = people,
@@ -268,8 +269,9 @@ class AppState(
         avoidWalking = avoidWalking,
         keywords = keywords.toList().ifEmpty { null },
         preferenceNote = preferenceNote.trim().ifBlank { null },
-        startLatitude = null,
-        startLongitude = null,
+        // 현재 위치가 있으면 1일차를 현재 위치에서 출발시킨다 (없으면 백엔드가 숙소 출발로 폴백)
+        startLatitude = startLat,
+        startLongitude = startLng,
     )
 
     /**
@@ -279,8 +281,10 @@ class AppState(
     suspend fun generatePlan() {
         errorMessage = null
         try {
+            // 현재 위치를 먼저 얻어 1일차 출발지로 쓴다 (권한 없거나 실패하면 null → 숙소 출발)
+            val loc = withContext(Dispatchers.Default) { getCurrentLocation() }
             val response = withContext(Dispatchers.Default) {
-                repository.createPlan(baseUrl, buildRequest())
+                repository.createPlan(baseUrl, buildRequest(loc?.first, loc?.second))
             }
             plan = response
             completedDays = 0
