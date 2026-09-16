@@ -36,3 +36,24 @@
 - (필요시) 운영 서버에서 `sudo certbot --nginx -d travit.p-e.kr` 실행해 HTTPS 적용
 - 최상위 `README.md`/`code/README.md`에 남은 웹 데모 관련 서술 정리 여부 결정
 
+## 2026-09-16 — 팀 커밋 반영 + 회원가입 인증메일 미발송 원인 파악
+
+### GitHub에 올라온 팀 커밋 pull (fast-forward, 5개)
+- `fix: 웹(Compose wasm) 빌드 타겟 복원` — 8/19에 지웠던 wasmJs 타겟을 팀에서 다시 살림 (node2 자동배포가 여전히 웹 빌드를 먼저 시도해 3주간 배포 실패했다는 사유). `code/frontend`(Vanilla JS)와 관리자 페이지는 삭제된 채로 유지됨 — 완전히 되돌아간 건 아님
+- LM Studio 관련 수정 3건: Bearer 인증 지원, Content-Type이 octet-stream이어도 파싱, max_tokens 상한(4000) 적용
+- `feat(app): 실지도·현재위치 출발·대중교통 안내 개선 및 취향 질문 통일`
+
+### 회원가입 인증메일이 안 오는 문제 — 원인 확정
+node2(`playlabs@10.8.2.5`, 서비스명 `trevit`, user-level systemd)의
+`journalctl --user -u trevit` 로그로 확인:
+- 8/6~8/10: 정상 발송(`인증코드 메일 발송 완료`)
+- **9/7부터 지금까지 전부 `Authentication failed`로 발송 실패** → 코드가 서버 로그에만 찍히고 사용자에게는 메일이 안 감 (MailService가 실패를 삼키고 로그 폴백하도록 설계돼 있어 에러가 겉으로 안 보임)
+- 정황: 8/6에 유출된 Gmail 앱 비밀번호를 "폐기·재발급 진행 중"이라던 것이 9/7 즈음 실제 처리(구글 쪽 폐기)됐는데, 서버의 `~/trevit/trevit.env`(`EnvironmentFile=%h/trevit/trevit.env`)에는 새 비밀번호가 반영 안 된 것으로 보였음
+- **추가로 확인된 사실**: 팀 공용 Gmail 계정(`travit.officiall@gmail.com`) 자체가 **봇 활동으로 오인되어 구글에 의해 계정이 삭제됨**. 즉 앱 비밀번호 재발급으로 해결 가능한 문제가 아니라, **발신 계정 자체가 없어진 상태**
+- **영향**: 이메일 인증이 필요한 회원가입 전체가 막힘 (SMTP 미설정/실패 시 로그 폴백만 되고 실제 발송은 안 됨)
+
+### 다음에 할 일 (추가)
+- [ ] 회원가입용 이메일 발송 계정 새로 준비 (Gmail 재가입 또는 다른 SMTP 제공자로 교체 — 재발급이 아니라 계정 자체를 새로 만들어야 함)
+- [ ] 새 계정으로 `~/trevit/trevit.env`의 `MAIL_HOST`/`MAIL_USERNAME`/`MAIL_PASSWORD`/`MAIL_FROM` 갱신 후 `systemctl --user restart trevit`
+- [ ] (권장) 같은 사유로 반복될 수 있으니 Gmail보다 SendGrid·AWS SES 등 트랜잭션 메일 전용 서비스로 교체 검토
+
