@@ -63,7 +63,28 @@ internal val setupStrings: Map<String, List<String>> = mapOf(
         "わからなければスキップしても大丈夫です",
         "不知道的话可以跳过",
     ),
+    "profile.q.Purpose.hint" to listOf("여러 개 고를 수 있어요", "You can pick more than one", "複数選べます", "可以多选"),
     "profile.q.Food.title" to listOf("어떤 음식을 좋아하세요?", "What food do you like?", "どんな料理が好きですか？", "你喜欢什么菜？"),
+    "profile.q.Food.hint" to listOf("여러 개 고를 수 있어요", "You can pick more than one", "複数選べます", "可以多选"),
+    "profile.q.MustVisit.title" to listOf(
+        "꼭 가고 싶은 곳이 있나요?",
+        "Any place you must visit?",
+        "絶対に行きたい場所はありますか？",
+        "有一定要去的地方吗？",
+    ),
+    "profile.q.MustVisit.hint" to listOf(
+        "장소 이름을 적으면 일정에 꼭 넣어 드려요 (최대 5곳)",
+        "Enter a place name and we'll make sure it's in your plan (up to 5)",
+        "場所の名前を入れると必ず日程に入れます（最大5か所）",
+        "输入地点名称，我们一定会把它排进行程（最多 5 个）",
+    ),
+    "profile.mustVisitPlaceholder" to listOf("예: 경복궁, 광장시장", "e.g. Gyeongbokgung, Gwangjang Market", "例：景福宮、広蔵市場", "例如：景福宫、广藏市场"),
+    "profile.mustVisitMax" to listOf(
+        "최대 {0}곳까지 넣을 수 있어요",
+        "You can add up to {0} places",
+        "最大{0}か所まで追加できます",
+        "最多可以添加 {0} 个地点",
+    ),
     "profile.q.Places.title" to listOf(
         "어떤 곳에 가고 싶으세요?",
         "Where would you like to go?",

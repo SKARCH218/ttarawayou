@@ -131,4 +131,85 @@ internal val tripStrings: Map<String, List<String>> = mapOf(
     "geo.attraction" to listOf("관광지", "Attraction", "観光地", "景点"),
     "geo.start" to listOf("출발지", "Starting point", "出発地", "出发地"),
     "geo.mystery" to listOf("미스터리", "Mystery", "ミステリー", "神秘"),
+
+    // ---- 여정: 시뮬레이션 / 실시간(GPS) 모드 ----
+    "journey.modeSim" to listOf("시뮬레이션 모드", "Simulation", "シミュレーション", "模拟模式"),
+    "journey.modeLive" to listOf("실시간 모드", "Live GPS", "リアルタイム", "实时模式"),
+    "journey.hintLiveWaiting" to listOf(
+        "현재 위치를 찾는 중이에요 — 위치 권한과 GPS를 확인해 주세요",
+        "Finding your location — check location permission and GPS",
+        "現在地を探しています — 位置情報の許可とGPSを確認してください",
+        "正在定位 — 请检查定位权限和 GPS",
+    ),
+    "journey.hintLive" to listOf(
+        "실제로 걸어서 보라색 길을 따라가세요",
+        "Walk along the purple path for real",
+        "実際に歩いて紫の道をたどってください",
+        "请实际沿着紫色路线前进",
+    ),
+    "journey.gpsWaiting" to listOf("GPS 신호 대기 중", "Waiting for GPS", "GPS信号待ち", "等待 GPS 信号"),
+    "journey.gpsTracking" to listOf(
+        "GPS 추적 중 · 도착 반경 {0}m",
+        "Tracking GPS · arrive within {0}m",
+        "GPS追跡中 · 到着半径 {0}m",
+        "GPS 追踪中 · 到达半径 {0}m",
+    ),
+
+    // ---- 여정: 다음 장소 힌트 ----
+    "hint.button" to listOf("힌트 {0}/{1}", "Hints {0}/{1}", "ヒント {0}/{1}", "提示 {0}/{1}"),
+    "hint.unlockIn" to listOf("{0} 더 가면 열려요", "Unlocks in {0}", "あと{0}で開きます", "再走 {0} 解锁"),
+    "hint.type" to listOf("다음은 {0}이에요", "Next up: a {0}", "次は{0}です", "下一站是{0}"),
+    "hint.area" to listOf("{0} 어딘가예요", "Somewhere in {0}", "{0}のどこかです", "在{0}的某处"),
+    "hint.areaFallback" to listOf("지금 가는 방향 그대로예요", "Keep going this way", "このまま進んでください", "保持当前方向"),
+    "hint.rating" to listOf("평점 {0}", "Rated {0}", "評価 {0}", "评分 {0}"),
+    "hint.cost" to listOf("약 {0}", "About {0}", "約{0}", "约 {0}"),
+    "hint.detailFallback" to listOf(
+        "가 보면 분명 마음에 들 거예요",
+        "You'll love it when you get there",
+        "行けばきっと気に入りますよ",
+        "到了你一定会喜欢",
+    ),
+    "hint.name" to listOf("{0}'{1}' ({2}글자)", "{0}'{1}' ({2} letters)", "{0}「{1}」（{2}文字）", "{0}“{1}”（{2}个字）"),
+
+    // ---- 여정: 음성 안내 ----
+    "voice.meters" to listOf("{0}미터", "{0} meters", "{0}メートル", "{0}米"),
+    "voice.kilometers" to listOf("{0}킬로미터", "{0} kilometers", "{0}キロメートル", "{0}公里"),
+    "voice.legWalk" to listOf(
+        "다음 비밀 장소까지 {0}, 걸어서 약 {1}분이에요. 보라색 길을 따라가세요.",
+        "The next secret spot is {0} away, about {1} minutes on foot. Follow the purple path.",
+        "次の秘密の場所まで{0}、徒歩で約{1}分です。紫の道をたどってください。",
+        "距离下一个秘密地点{0}，步行约{1}分钟。请沿着紫色路线前进。",
+    ),
+    "voice.legTransit" to listOf(
+        "다음 비밀 장소까지 {0}, 대중교통으로 약 {1}분이에요. 보라색 길을 따라가세요.",
+        "The next secret spot is {0} away, about {1} minutes by public transit. Follow the purple path.",
+        "次の秘密の場所まで{0}、公共交通で約{1}分です。紫の道をたどってください。",
+        "距离下一个秘密地点{0}，乘公共交通约{1}分钟。请沿着紫色路线前进。",
+    ),
+    "voice.alightNext" to listOf(
+        "다음 정거장에서 내릴 준비를 하세요.",
+        "Get ready to get off at the next stop.",
+        "次の停留所で降りる準備をしてください。",
+        "请准备在下一站下车。",
+    ),
+    "voice.alightNow" to listOf("이번 정거장에서 내리세요.", "Get off at this stop.", "この停留所で降りてください。", "请在本站下车。"),
+    "voice.near" to listOf(
+        "비밀 장소까지 100미터 남았어요.",
+        "100 meters to the secret spot.",
+        "秘密の場所まであと100メートルです。",
+        "距离秘密地点还有 100 米。",
+    ),
+    "voice.arrived" to listOf(
+        "도착했어요! 이곳은 {0}, {1}입니다.",
+        "You've arrived! This is a {0}: {1}.",
+        "到着しました！ここは{0}、{1}です。",
+        "到达了！这里是{0}：{1}。",
+    ),
+    "voice.dayDone" to listOf(
+        "오늘의 여정을 모두 마쳤어요. 수고하셨어요!",
+        "You've finished today's journey. Great job!",
+        "今日の旅程はすべて終わりました。お疲れさまでした！",
+        "今天的行程全部完成了，辛苦了！",
+    ),
+    "voice.newHint" to listOf("새 힌트가 열렸어요. {0}", "New hint unlocked. {0}", "新しいヒントが開きました。{0}", "新提示已解锁。{0}"),
 )

@@ -1,5 +1,8 @@
 package com.trevit.app.map
 
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
+
 /**
  * 웹은 현재 위치를 사용하지 않고 null을 반환한다 → 플랜은 숙소를 1일차 출발지로 삼는다.
  *
@@ -8,3 +11,5 @@ package com.trevit.app.map
  *  Android/iOS 앱 전용 기능으로 둔다.)
  */
 actual suspend fun getCurrentLocation(): Pair<Double, Double>? = null
+
+actual fun locationUpdates(): Flow<Pair<Double, Double>> = emptyFlow()

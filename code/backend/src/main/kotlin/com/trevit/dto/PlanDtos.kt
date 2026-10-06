@@ -14,11 +14,12 @@ object PlanDtos {
         val gender: String? = null,           // MALE | FEMALE | NONE
         val ageGroup: String? = null,         // 10대 | 20대 | 30대 | 40대 | 50대+
         val mbti: String? = null,             // 16 types 또는 null
-        val purpose: String? = null,          // 휴양 | 관광 | 미식 | 액티비티
-        val foodPreference: String? = null,   // 한식 | 양식 | 일식 | 중식 | 상관없음
+        val purpose: String? = null,          // 휴양 | 관광 | 미식 | 액티비티 (여러 개면 ", "로 연결)
+        val foodPreference: String? = null,   // 한식 | 양식 | 일식 | 중식 | 상관없음 (여러 개면 ", "로 연결)
         val avoidWalking: Boolean = false,    // 걷기 기피 → 도보 최소화 + 산/등산 장소 회피
         val keywords: List<String>? = null,   // 선호 키워드: 산 | 바다 | 공원 | 강
         val preferenceNote: String? = null,   // 자유 서술 취향 ("매운 음식 좋아요, 조용한 카페 위주로")
+        val mustVisit: List<String>? = null,  // 꼭 가고 싶은 장소 이름 (예: ["경복궁","광장시장"])
         val language: String? = null,         // 앱 화면 언어 ko | en | ja | zh — AI·설명 문구 언어
     )
 
@@ -33,14 +34,19 @@ object PlanDtos {
         val avoidWalking: Boolean = false,
         val keywords: List<String> = emptyList(),
         val preferenceNote: String? = null,
+        val mustVisit: List<com.trevit.entity.Place> = emptyList(),
         /** AI가 reason 을 쓸 언어 (ko | en | ja | zh) */
         val language: String = "ko",
     ) {
         fun isEmpty(): Boolean =
             gender == null && ageGroup == null && mbti == null && purpose == null &&
                 foodPreference == null && !avoidWalking && keywords.isEmpty() &&
-                preferenceNote.isNullOrBlank()
+                preferenceNote.isNullOrBlank() && mustVisit.isEmpty()
     }
+
+    /** "휴양, 미식" 처럼 ", "로 이어 보낸 다중 선택 값을 나눈다 */
+    fun splitChoices(value: String?): List<String> =
+        value?.split(",")?.map { it.trim() }?.filter { it.isNotEmpty() }.orEmpty()
 
     /** 예산 배분 내역 */
     data class BudgetBreakdown(

@@ -25,3 +25,4 @@ deploy/trevit-deploy.tar.gz
 **/node_modules/
 **/.gradle/
 **/local.properties
+**/.kotlin/

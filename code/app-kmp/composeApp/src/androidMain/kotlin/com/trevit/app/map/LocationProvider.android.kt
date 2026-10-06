@@ -7,6 +7,10 @@ import android.location.Location
 import android.location.LocationListener
 import android.location.LocationManager
 import android.os.Looper
+import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.coroutines.resume
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -62,4 +66,32 @@ actual suspend fun getCurrentLocation(): Pair<Double, Double>? {
         }
     }
     return fresh?.let { it.latitude to it.longitude }
+}
+
+@SuppressLint("MissingPermission")
+actual fun locationUpdates(): Flow<Pair<Double, Double>> {
+    val ctx = AndroidAppContext.context ?: return emptyFlow()
+    val fine = ctx.checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION)
+    val coarse = ctx.checkSelfPermission(android.Manifest.permission.ACCESS_COARSE_LOCATION)
+    if (fine != PackageManager.PERMISSION_GRANTED && coarse != PackageManager.PERMISSION_GRANTED) {
+        return emptyFlow()
+    }
+    val lm = ctx.getSystemService(Context.LOCATION_SERVICE) as? LocationManager ?: return emptyFlow()
+
+    return callbackFlow {
+        val listener = object : LocationListener {
+            override fun onLocationChanged(location: Location) {
+                trySend(location.latitude to location.longitude)
+            }
+            override fun onProviderDisabled(provider: String) {}
+            override fun onProviderEnabled(provider: String) {}
+            @Deprecated("deprecated in API 29")
+            override fun onStatusChanged(provider: String?, status: Int, extras: android.os.Bundle?) {}
+        }
+        // GPS가 정확하지만 실내에선 안 잡히므로 네트워크 위치도 같이 받는다
+        listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER)
+            .filter { runCatching { lm.isProviderEnabled(it) }.getOrDefault(false) }
+            .forEach { lm.requestLocationUpdates(it, 1_000L, 1f, listener, Looper.getMainLooper()) }
+        awaitClose { lm.removeUpdates(listener) }
+    }
 }

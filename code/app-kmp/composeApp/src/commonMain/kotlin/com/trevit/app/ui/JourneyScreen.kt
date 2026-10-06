@@ -34,6 +34,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableDoubleStateOf
@@ -73,12 +74,19 @@ import com.trevit.app.map.LegGeometry
 import com.trevit.app.map.MapCamera
 import com.trevit.app.map.TILE_SIZE
 import com.trevit.app.map.TileKey
+import com.trevit.app.map.haversineMeters
+import com.trevit.app.map.locationUpdates
 import com.trevit.app.map.stopEmoji
 import com.trevit.app.map.stopTypeLabel
 import com.trevit.app.oneDecimal
+import com.trevit.app.i18n.AppLanguage
 import com.trevit.app.i18n.LocalLanguage
 import com.trevit.app.i18n.tokens
 import com.trevit.app.i18n.tr
+import com.trevit.app.i18n.translate
+import com.trevit.app.voice.speak
+import com.trevit.app.voice.spokenDistance
+import com.trevit.app.voice.stopSpeaking
 import com.trevit.shared.StopDto
 import com.trevit.shared.TileFetcher
 import kotlinx.coroutines.Dispatchers
@@ -88,6 +96,7 @@ import org.jetbrains.compose.resources.ExperimentalResourceApi
 import org.jetbrains.compose.resources.decodeToImageBitmap
 import kotlin.math.PI
 import kotlin.math.ceil
+import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
 import kotlin.math.sin
@@ -130,10 +139,29 @@ fun JourneyScreen(state: AppState, dayIndex: Int) {
     var revealStop by remember(dayIndex) { mutableStateOf<StopDto?>(null) }
     var revealedCount by remember(dayIndex) { mutableIntStateOf(1) } // 출발지는 공개
     var completed by remember(dayIndex) { mutableStateOf(false) }
+    var liveMode by remember(dayIndex) { mutableStateOf(false) }
+    var liveFix by remember(dayIndex) { mutableStateOf<Pair<Double, Double>?>(null) }
+
+    // ---- 실시간 모드: 실제 GPS 위치를 경로에 투영해 진행 ----
+    LaunchedEffect(liveMode, legIndex, revealStop, completed) {
+        if (!liveMode || revealStop != null || completed) return@LaunchedEffect
+        locationUpdates().collect { (lat, lng) ->
+            liveFix = lat to lng
+            val geom = geoms[legIndex]
+            // GPS 흔들림으로 뒤로 튀지 않도록 앞으로만 진행
+            distOnLeg = max(distOnLeg, geom.project(lat, lng))
+            val (destLat, destLng) = geom.points.last()
+            if (revealStop == null && haversineMeters(lat, lng, destLat, destLng) <= ARRIVE_RADIUS_M) {
+                distOnLeg = geom.lengthMeters
+                revealStop = stops.getOrNull(legIndex + 1)
+                if (revealStop == null) completed = true
+            }
+        }
+    }
 
     // ---- 시뮬레이션 틱 ----
-    LaunchedEffect(playing, speedIdx, legIndex) {
-        if (!playing) return@LaunchedEffect
+    LaunchedEffect(playing, speedIdx, legIndex, liveMode) {
+        if (!playing || liveMode) return@LaunchedEffect
         var last: TimeSource.Monotonic.ValueTimeMark? = null
         while (isActive && playing) {
             kotlinx.coroutines.delay(16)
@@ -195,6 +223,48 @@ fun JourneyScreen(state: AppState, dayIndex: Int) {
         if (totalStops > 0) ceil(totalStops * (1.0 - progress)).toInt().coerceAtLeast(0) else -1
     } else -1
 
+    // ---- 다음 장소 힌트: 가까워질수록 하나씩 열린다 ----
+    val lang = LocalLanguage.current
+    val hints = remember(dayIndex, legIndex, lang) { nextStop?.let { buildHints(it, lang) }.orEmpty() }
+    val legProgress = (distOnLeg / currentGeom.lengthMeters).coerceIn(0.0, 1.0)
+    val unlockedHints = hints.count { legProgress >= it.at }
+    var showHints by remember(dayIndex) { mutableStateOf(false) }
+
+    // ---- 음성 안내 (화면 언어로 읽는다) ----
+    val say: (String) -> Unit = { if (state.voiceEnabled) speak(it, lang) }
+    fun t(key: String, vararg args: Any?) = translate(lang, key, *args)
+    LaunchedEffect(legIndex, unlockedHints) {
+        // 첫 힌트(종류)는 구간 시작 안내와 겹치므로 두 번째부터 읽는다
+        if (unlockedHints >= 2) say(t("voice.newHint", hints[unlockedHints - 1].text))
+    }
+    DisposableEffect(Unit) { onDispose { stopSpeaking() } }
+    LaunchedEffect(legIndex) {
+        val key = if (currentLeg.mode == "TRANSIT") "voice.legTransit" else "voice.legWalk"
+        say(t(key, spokenDistance(currentGeom.lengthMeters, lang), currentLeg.durationMinutes))
+    }
+    LaunchedEffect(legIndex, currentSegIndex) {
+        // 구간 설명은 서버가 한국어로 주므로 한국어 화면에서만 읽는다
+        if (currentSegIndex >= 0 && lang == AppLanguage.KO) transitSegments[currentSegIndex].description?.let(say)
+    }
+    LaunchedEffect(legIndex, currentSegIndex, remainingStops) {
+        when (remainingStops) {
+            1 -> say(t("voice.alightNext"))
+            0 -> say(t("voice.alightNow"))
+        }
+    }
+    val near = remainMeters <= 100.0 && currentGeom.lengthMeters > 200.0
+    LaunchedEffect(legIndex, near) {
+        if (near) say(t("voice.near"))
+    }
+    LaunchedEffect(revealStop) {
+        revealStop?.let { s ->
+            say(t("voice.arrived", stopTypeLabel(s.type, lang), s.name ?: t("journey.mysteryPlace")))
+        }
+    }
+    LaunchedEffect(completed) {
+        if (completed) say(t("voice.dayDone"))
+    }
+
     Box(Modifier.fillMaxSize()) {
         // ================= Canvas 지도 =================
         JourneyMap(
@@ -235,6 +305,11 @@ fun JourneyScreen(state: AppState, dayIndex: Int) {
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
+                Spacer(Modifier.width(12.dp))
+                VoiceToggleButton(state.voiceEnabled) {
+                    state.voiceEnabled = !state.voiceEnabled
+                    if (!state.voiceEnabled) stopSpeaking()
+                }
             }
 
             // ---- 웹 `.progress-pill` ----
@@ -242,6 +317,24 @@ fun JourneyScreen(state: AppState, dayIndex: Int) {
                 tr("journey.progress", revealedCount, geoms.size),
                 Modifier.align(Alignment.CenterHorizontally),
             )
+
+            if (hints.isNotEmpty() && revealStop == null && !completed) {
+                Spacer(Modifier.height(8.dp))
+                HintButton(
+                    unlocked = unlockedHints,
+                    total = hints.size,
+                    expanded = showHints,
+                    onClick = { showHints = !showHints },
+                    modifier = Modifier.align(Alignment.CenterHorizontally),
+                )
+                if (showHints) {
+                    Spacer(Modifier.height(8.dp))
+                    HintCard(
+                        hints, legProgress, currentGeom.lengthMeters,
+                        Modifier.padding(horizontal = 16.dp),
+                    )
+                }
+            }
 
             if (currentLeg.mode == "TRANSIT") {
                 Spacer(Modifier.height(8.dp))
@@ -281,26 +374,62 @@ fun JourneyScreen(state: AppState, dayIndex: Int) {
 
             // ---- 웹 `.mystery-hint` — 지도 위에 뜨는 안내 ----
             MysteryHint(
-                if (playing) tr("journey.hintPlaying") else tr("journey.hintIdle"),
+                when {
+                    liveMode && liveFix == null -> tr("journey.hintLiveWaiting")
+                    liveMode -> tr("journey.hintLive")
+                    playing -> tr("journey.hintPlaying")
+                    else -> tr("journey.hintIdle")
+                },
                 Modifier.padding(horizontal = 16.dp),
             )
+
+            // ---- 모드 선택: 시뮬레이션 / 실시간(GPS) ----
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(start = 16.dp, end = 16.dp, top = 14.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                SimButton(
+                    tr("journey.modeSim"),
+                    primary = false,
+                    selected = !liveMode,
+                    modifier = Modifier.weight(1f),
+                ) { liveMode = false }
+                SimButton(
+                    tr("journey.modeLive"),
+                    primary = false,
+                    selected = liveMode,
+                    modifier = Modifier.weight(1f),
+                ) {
+                    liveMode = true
+                    playing = false
+                }
+            }
 
             // ---- 웹 `.map-bottombar` + `.sim-btn` ----
             Row(
                 Modifier
                     .fillMaxWidth()
-                    .padding(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 26.dp),
+                    .padding(start = 16.dp, end = 16.dp, top = 10.dp, bottom = 26.dp),
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                SimButton(
-                    text = if (playing) tr("journey.pause") else tr("journey.simulate"),
-                    primary = true,
-                    enabled = revealStop == null && !completed,
-                    modifier = Modifier.weight(1f),
-                ) { playing = !playing }
-                SPEED_OPTIONS.forEachIndexed { i, (_, label) ->
-                    SimButton(label, primary = false, selected = speedIdx == i) { speedIdx = i }
+                if (liveMode) {
+                    MapPill(
+                        if (liveFix == null) tr("journey.gpsWaiting") else tr("journey.gpsTracking", ARRIVE_RADIUS_M.toInt()),
+                        Modifier.weight(1f),
+                    )
+                } else {
+                    SimButton(
+                        text = if (playing) tr("journey.pause") else tr("journey.simulate"),
+                        primary = true,
+                        enabled = revealStop == null && !completed,
+                        modifier = Modifier.weight(1f),
+                    ) { playing = !playing }
+                    SPEED_OPTIONS.forEachIndexed { i, (_, label) ->
+                        SimButton(label, primary = false, selected = speedIdx == i) { speedIdx = i }
+                    }
                 }
             }
         }
@@ -318,7 +447,7 @@ fun JourneyScreen(state: AppState, dayIndex: Int) {
                     } else {
                         legIndex++
                         distOnLeg = 0.0
-                        playing = true
+                        playing = !liveMode
                     }
                 },
             )
@@ -583,6 +712,27 @@ private fun MapBackButton(onClick: () -> Unit) {
                 contentDescription = tr("journey.backCd"),
                 tint = WebMintDeep,
                 modifier = Modifier.size(20.dp),
+            )
+        }
+    }
+}
+
+/** 음성 안내 켜기/끄기 — 뒤로 버튼과 같은 모양 */
+@Composable
+private fun VoiceToggleButton(enabled: Boolean, onClick: () -> Unit) {
+    Surface(
+        onClick = onClick,
+        modifier = Modifier.size(40.dp),
+        shape = RoundedCornerShape(12.dp),
+        color = webSurface(),
+        border = BorderStroke(1.dp, webBorderStrong()),
+        shadowElevation = 2.dp,
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Text(
+                if (enabled) "🔊" else "🔇",
+                fontSize = 18.sp,
+                fontFamily = TossFaceFontFamily,
             )
         }
     }

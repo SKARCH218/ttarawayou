@@ -43,6 +43,26 @@ class PlaceProviderService(
         return pool
     }
 
+    /**
+     * "꼭 가고 싶은 곳" 이름을 실제 장소로 찾는다.
+     * 후보 목록에 이미 있으면 그걸 쓰고, 없으면 TMAP 이름 검색(기준점 50km 이내)으로 찾는다.
+     */
+    fun findByName(name: String, lat: Double, lng: Double, pool: Pool): Place? {
+        val q = name.trim()
+        if (q.length < 2) return null
+        pool.all()
+            .filter { it.type != PlaceType.LODGING && it.name.length >= 2 }
+            .firstOrNull { it.name.contains(q) || q.contains(it.name) }
+            ?.let { return it }
+
+        val poi = tmapService.searchPois(q, lat, lng, 5)
+            .firstOrNull { GeoUtil.distanceMeters(lat, lng, it.lat, it.lng) <= MUST_VISIT_RADIUS_M }
+            ?: return null
+        val type = if (Regex("음식|식당|카페|주점|베이커리").containsMatchIn(poi.category)) PlaceType.RESTAURANT
+            else PlaceType.ATTRACTION
+        return toPlaces(listOf(poi), type).firstOrNull()
+    }
+
     private fun fetch(lat: Double, lng: Double): Pool {
         // (a) 키 없음 / (b) 쿼터 초과 → 즉시 시드 폴백 (재시도 금지)
         if (tmapService.usable()) {
@@ -101,5 +121,6 @@ class PlaceProviderService(
     companion object {
         private const val FETCH_COUNT = 60 // 카테고리당 후보 수
         private const val MIN_USABLE = 6   // 이보다 적으면 시드 폴백
+        private const val MUST_VISIT_RADIUS_M = 50_000.0 // 이보다 먼 동명 장소는 다른 지역으로 보고 제외
     }
 }
