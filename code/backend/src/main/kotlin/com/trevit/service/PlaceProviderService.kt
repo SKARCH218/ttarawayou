@@ -124,6 +124,37 @@ class PlaceProviderService(
         }
     }
 
+    /**
+     * TMAP에는 가격이 없어 이름·업종으로 등급을 나눠 추정한다 (같은 이름은 늘 같은 값).
+     * 등급이 없으면 예산이 커도 쓸 곳이 없어 플랜 금액이 예산에 한참 못 미친다.
+     */
+    private fun estimatePrice(text: String, type: PlaceType, h: Int): Int {
+        fun band(min: Int, max: Int, step: Int) = min + (h % ((max - min) / step + 1)) * step
+        return when (type) {
+            PlaceType.LODGING -> when {
+                Regex("호텔|리조트|스위트").containsMatchIn(text) -> band(150_000, 350_000, 10_000)
+                Regex("게스트하우스|호스텔|게하|민박").containsMatchIn(text) -> band(35_000, 70_000, 5_000)
+                Regex("한옥|풀빌라|글램핑").containsMatchIn(text) -> band(120_000, 280_000, 10_000)
+                else -> band(60_000, 170_000, 10_000)                                   // 모텔·펜션 등
+            }
+            PlaceType.RESTAURANT -> when {
+                Regex("오마카세|파인다이닝|코스|한우|스테이크하우스|호텔 ?뷔페").containsMatchIn(text) -> band(50_000, 120_000, 5_000)
+                Regex("횟집|대게|장어|소고기|갈비|한정식|스시|초밥|뷔페|와인|이자카야").containsMatchIn(text) -> band(25_000, 45_000, 5_000)
+                Regex("카페|커피|베이커리|디저트|빙수|제과").containsMatchIn(text) -> band(6_000, 14_000, 1_000)
+                Regex("분식|국밥|김밥|떡볶이|칼국수|백반").containsMatchIn(text) -> band(7_000, 11_000, 1_000)
+                else -> band(10_000, 22_000, 2_000)
+            }
+            PlaceType.ATTRACTION -> when {
+                Regex("테마파크|놀이공원|워터파크|아쿠아리움|랜드$|월드$").containsMatchIn(text) -> band(35_000, 60_000, 5_000)
+                Regex("케이블카|스카이|전망대|루지|짚라인|체험|공방|클래스|스파|온천|찜질|요트|카약|서핑").containsMatchIn(text) ->
+                    band(12_000, 30_000, 2_000)
+                Regex("박물관|미술관|궁$|성$|기념관|과학관|전시").containsMatchIn(text) -> if (h % 3 == 0) 0 else band(2_000, 8_000, 1_000)
+                Regex("공원|해변|해수욕장|산$|시장|거리|골목|마을|강변|호수").containsMatchIn(text) -> 0
+                else -> if (h % 3 == 0) 0 else band(1_000, 6_000, 1_000)
+            }
+        }
+    }
+
     private fun toPlaces(
         pois: List<TmapService.Poi>, type: PlaceType,
         description: String = "TMAP 검색 결과 (가격은 추정)",
@@ -135,11 +166,7 @@ class PlaceProviderService(
             val n = poi.name
             if (n.contains("주차장") || n.endsWith("입구") || n.contains("화장실")) continue
             val h = Math.abs(n.hashCode())
-            val price = when (type) {
-                PlaceType.LODGING -> 60_000 + (h % 12) * 10_000          // 6만~17만/박
-                PlaceType.RESTAURANT -> 8_000 + (h % 5) * 2_000          // 8천~1.6만/인
-                PlaceType.ATTRACTION -> if (h % 3 == 0) 0 else 1_000 + (h % 5) * 1_000 // 무료~5천
-            }
+            val price = estimatePrice("$n ${poi.category}", type, h)
             val rating = Math.round((3.8 + (h % 12) * 0.1) * 10) / 10.0  // 3.8~4.9
             val p = Place(
                 n, type, poi.address.ifBlank { "주소 정보 없음" },
@@ -152,7 +179,7 @@ class PlaceProviderService(
     }
 
     companion object {
-        private const val FETCH_COUNT = 60 // 카테고리당 후보 수
+        private const val FETCH_COUNT = 100 // 카테고리당 후보 수 (긴 여행도 날마다 다른 곳을 고를 수 있게, TMAP 최대 200)
         private const val MIN_USABLE = 6   // 이보다 적으면 시드 폴백
         private const val MUST_VISIT_RADIUS_M = 50_000.0 // 이보다 먼 동명 장소는 다른 지역으로 보고 제외
         private const val SEED_MAX_DISTANCE_M = 60_000.0 // 시드 장소가 이보다 멀면 그 지역 시드가 없는 것

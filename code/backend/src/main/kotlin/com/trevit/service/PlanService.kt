@@ -14,6 +14,8 @@ import com.trevit.repository.WalletRepository
 import org.slf4j.LoggerFactory
 import kotlin.random.Random
 import org.springframework.stereotype.Service
+import java.time.LocalDate
+import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -40,7 +42,7 @@ class PlanService(
     private val log = LoggerFactory.getLogger(PlanService::class.java)
 
     fun createPlan(req: PlanRequest): PlanResponse {
-        val days = req.days.coerceIn(1, 7)
+        val days = req.days.coerceAtLeast(1)
         val people = maxOf(1, req.people)
         val budget = maxOf(0, req.budget)
         val dayTrip = days == 1         // 당일치기: 숙박 없음
@@ -78,8 +80,12 @@ class PlanService(
         // 장소 후보: TMAP POI 실시간 조회 → 키 없음/429/부족 시 수도권 시드 폴백
         // + 취향 검색: 고른 취향마다 그에 맞는 장소를 따로 찾아 섞는다 (같은 지역도 취향에 따라 다른 곳이 나온다)
         val spotsPerDay = PlanDtos.spotsPerDay(req.pace)
+        // 1인당 하루 예산이 넉넉하면 고급 식당·숙소·유료 체험도 찾아 둔다 — 예산을 쓸 수 있는 선택지가 있어야
+        // 플랜 금액이 예산에 가깝게 나온다
+        val perPersonDay = budget / maxOf(1, days * people)
+        val premium = if (perPersonDay >= PREMIUM_PER_PERSON_DAY) PREMIUM_SEARCHES else emptyList()
         val prefPlaces = placeProvider.preferencePlaces(
-            anchorLat, anchorLng, PreferenceKeywords.searches(req, PREF_SEARCH_LIMIT), PREF_RADIUS_M,
+            anchorLat, anchorLng, PreferenceKeywords.searches(req, PREF_SEARCH_LIMIT) + premium, PREF_RADIUS_M,
         )
         val rawPool = withPreferencePlaces(placeProvider.places(anchorLat, anchorLng), prefPlaces)
         // 취향 점수는 장소를 고를 때만 쓰고, 화면에는 원래 평점을 보여준다
@@ -159,39 +165,36 @@ class PlanService(
             ai = null
         }
 
-        val lodging: Place?              // 당일치기면 null
-        val perDay: List<List<Place>>    // 일자별 장소 (AI면 방문 순서 그대로, 휴리스틱이면 미정렬)
+        val lodging0: Place?             // 당일치기면 null
+        val perDay0: List<List<Place>>   // 일자별 장소 (AI면 방문 순서 그대로, 휴리스틱이면 미정렬)
         val aiOrdered: Boolean
         val plannedBy: String
 
         if (ai != null) {
-            lodging = if (dayTrip) null else ai.lodging
-            perDay = ai.days
+            lodging0 = if (dayTrip) null else ai.lodging
+            perDay0 = ai.days
             aiOrdered = true       // AI가 정한 방문 순서를 존중한다
             plannedBy = "AI"
         } else {
             // ---------- 폴백: 휴리스틱 ----------
-            lodging = if (dayTrip) null else pickLodging(nearbyLodgings(pool.lodgings, hubCenter), nights, lodgingBudget)
+            lodging0 = if (dayTrip) null else pickLodging(nearbyLodgings(pool.lodgings, hubCenter), nights, lodgingBudget)
 
             // 이 지역 최저가 숙소마저 숙박 예산을 넘으면(예: 성수기 리조트 지역),
             // 초과분을 관광·식비 예산에서 비례 차감해 총액이 예산을 넘지 않게 한다.
-            val lodgingOver = maxOf(0, (lodging?.price?.toLong() ?: 0L) * nights - lodgingBudget)
+            val lodgingOver = maxOf(0, (lodging0?.price?.toLong() ?: 0L) * nights - lodgingBudget)
             val cut = if (lodgingOver > 0 && attractionBudget + foodBudget > 0) lodgingOver else 0L
             val attractionCut = cut * attractionBudget / maxOf(1, attractionBudget + foodBudget)
             val attractionBudgetAdj = maxOf(0, attractionBudget - attractionCut)
             val foodBudgetAdj = maxOf(0, foodBudget - (cut - attractionCut))
 
             // 그날 동네 안에서만 관광지 3곳 + 식당 3곳 (예산은 날짜별로 나눈다)
-            perDay = zones.map { z ->
+            perDay0 = zones.map { z ->
                 pickPlaces(z.attractions, z.lat, z.lng, attractionBudgetAdj / days, people, spotsPerDay) +
                     pickPlaces(z.restaurants, z.lat, z.lng, foodBudgetAdj / days, people, 3)
             }
             aiOrdered = false
             plannedBy = "ALGORITHM"
         }
-
-        val mustByDay = assignMustVisit(perDay, mustPlaces, days)
-        val lodgingSpent = lodging?.let { it.price.toLong() * nights } ?: 0L
 
         // 일자별 출발 시각: 1일차는 현재 시각(밤·새벽이면 09:00), 이후 날은 09:00
         val dayStarts = (0 until days).map { d ->
@@ -204,6 +207,22 @@ class PlanService(
                 LocalTime.of(9, 0)
             }
         }
+
+        // ---------- 예산 맞추기: 총액이 예산에 최대한 가깝게(넘지 않게) ----------
+        // 카테고리별 몫을 따로 쓰면 관광 몫처럼 쓸 데 없는 돈이 남는다. 전체를 한 덩어리로 보고
+        // 숙소·장소를 같은 동네 안에서 더 좋은(비싼) 곳으로 바꾸거나, 넘치면 낮춘다.
+        val fitted = fitToBudget(
+            lodging0, perDay0,
+            candidates = pool.all() + mustPlaces,
+            lodgingOptions = if (dayTrip) emptyList() else pool.lodgings,
+            lodgingCenter = hubCenter, must = mustPlaces, budget = budget, nights = nights, people = people,
+            mealsPerDay = dayStarts.map { mealSlots(it).size }, spotsPerDay = spotsPerDay,
+        )
+        val lodging = fitted.first
+        val perDay = fitted.second
+
+        val mustByDay = assignMustVisit(perDay, mustPlaces, days)
+        val lodgingSpent = lodging?.let { it.price.toLong() * nights } ?: 0L
 
         // ---------- 일자별 동선·이동 구간 생성 ----------
         val dayPlans = ArrayList<DayPlanDto>()
@@ -301,11 +320,13 @@ class PlanService(
                 legs.add(leg)
             }
 
-            // 일정표 시각 계산 — 버스 구간은 평균 대기 7분 포함, 식당 50분·관광지 60분 체류 반영
+            // 일정표 시각 계산 — 버스 대기는 API(실시간 도착정보·배차 간격) 기준, 식당 50분·관광지 60분 체류 반영
+            val date = LocalDate.now(SEOUL).plusDays(d.toLong())
+            val now = LocalDateTime.now(SEOUL)
             var clock = dayStarts[d]
             for (i in legs.indices) {
                 val depart = clock
-                val moveMin = legs[i].durationMinutes + (if (legs[i].mode == "TRANSIT") TRANSIT_WAIT_MIN else 0)
+                val moveMin = legs[i].durationMinutes + routeService.busWaitMinutes(legs[i], date.atTime(depart), now)
                 clock = clock.plusMinutes(moveMin.toLong())
                 legs[i] = legs[i].withTimes(depart.format(HHMM), clock.format(HHMM))
                 val nextType = stops[i + 1].type
@@ -328,6 +349,11 @@ class PlanService(
             lodgingBudget, attractionBudget, foodBudget, transportBudget,
             lodgingSpent, attractionSpent, foodSpent, transportSpent,
         )
+
+        // 가장 싼 숙소·장소로 줄여도 예산을 넘으면(예: 3일에 10만 원) 예산보다 많이 차감하지 않고 거절한다
+        require(totalCost <= budget) {
+            "예산이 부족해요. 이 일정은 가장 저렴하게 짜도 ${totalCost}토큰이 필요해요 (일수를 줄이거나 예산을 늘려 주세요)"
+        }
 
         // 토큰 차감 (1토큰 = 1원, 예상 총비용만큼 / 음수 방지)
         wallet.balance = maxOf(0, wallet.balance - totalCost)
@@ -435,6 +461,124 @@ class PlanService(
         )
     }
 
+    /**
+     * 총액을 예산에 맞춘다. 목표 = 예산의 FIT_TARGET_PCT% − 예상 교통비.
+     * - 넘치면: 숙소를 더 싼 곳으로 → 가장 비싼 장소를 같은 동네의 더 싼 곳으로(없으면 빼되 하루 1곳은 남김)
+     * - 남으면: 남는 금액 안에서 가장 크게 올릴 수 있는 한 수를 반복한다
+     *   (숙소 업그레이드 / 그날 동네(중심 FIT_RADIUS_M) 안의 더 비싼 관광지·식당으로 교체 /
+     *    관광지가 페이스보다 적은 날은 유료 관광지 추가 — 페이스를 넘겨 더 넣지는 않는다)
+     * 자리만 바꾸므로 AI가 정한 방문 순서도 그대로 유지된다.
+     */
+    private fun fitToBudget(
+        lodging0: Place?, perDay0: List<List<Place>>, candidates: List<Place>, lodgingOptions: List<Place>,
+        lodgingCenter: Pair<Double, Double>, must: List<Place>, budget: Long, nights: Int, people: Int,
+        mealsPerDay: List<Int>, spotsPerDay: Int,
+    ): Pair<Place?, List<List<Place>>> {
+        var lodging = lodging0
+        val days = perDay0.map { ArrayList(it) }
+        val mustIds = must.mapNotNull { it.id }.toSet()
+        val lodgings = lodgingOptions
+            .sortedBy { dist(lodgingCenter.first, lodgingCenter.second, it) }.take(FIT_LODGING_OPTIONS)
+
+        fun cost(p: Place) = p.price.toLong() * people
+        fun mealCap(d: Int) = mealsPerDay.getOrElse(d) { 3 }
+        // 끼니 수를 넘는 식당은 일정에서 빠지므로 끼니 수만큼만 센다
+        fun countedRestaurants(d: Int) = days[d].filter { it.type == PlaceType.RESTAURANT }.take(mealCap(d))
+        fun spend(): Long {
+            var s = (lodging?.price?.toLong() ?: 0L) * nights
+            for (d in days.indices) {
+                s += days[d].filter { it.type == PlaceType.ATTRACTION }.sumOf(::cost)
+                s += countedRestaurants(d).sumOf(::cost)
+            }
+            s += must.filter { m -> days.none { day -> day.any { it.id == m.id } } }.sumOf(::cost)
+            return s
+        }
+        fun target(): Long {
+            val legs = days.sumOf { it.size + 1 } + (if (nights > 0) days.size else 0)
+            return budget * FIT_TARGET_PCT / 100 - legs * people * TRANSIT_EST_PER_LEG
+        }
+        fun nearby(d: Int, type: PlaceType): List<Place> {
+            val list = days[d].takeIf { it.isNotEmpty() } ?: return emptyList()
+            val cLat = list.map { it.latitude }.average()
+            val cLng = list.map { it.longitude }.average()
+            val used = days.flatten().mapNotNull { it.id }.toSet() + mustIds
+            return candidates.filter { it.type == type && it.id !in used && dist(cLat, cLng, it) <= FIT_RADIUS_M }
+        }
+
+        // ---- 넘치면 줄인다 ----
+        for (step in 0 until FIT_MAX_STEPS) {
+            if (spend() <= target()) break
+            val cur = lodging
+            val cheaperLodging = if (cur != null) lodgings.filter { it.price < cur.price }.minByOrNull { it.price } else null
+            if (cheaperLodging != null) {
+                lodging = cheaperLodging
+                continue
+            }
+            val (d, p) = days.withIndex()
+                .flatMap { (d, list) -> list.map { d to it } }
+                .filter { (_, p) -> p.id !in mustIds && p.price > 0 }
+                .maxByOrNull { (_, p) -> p.price } ?: break
+            val cheaper = nearby(d, p.type).filter { it.price < p.price }.minByOrNull { it.price }
+            when {
+                cheaper != null -> days[d][days[d].indexOf(p)] = cheaper
+                days[d].count { it.type == p.type } > 1 -> days[d].remove(p)
+                else -> break
+            }
+        }
+
+        // ---- 빠진 끼니·볼거리부터 채운다 (업그레이드보다 먼저 — 끼니가 없는 날이 생기지 않게) ----
+        for (step in 0 until FIT_MAX_STEPS) {
+            val gap = target() - spend()
+            val missing = days.indices.flatMap { d ->
+                val needMeal = countedRestaurants(d).size < mealCap(d)
+                val needSight = days[d].count { it.type == PlaceType.ATTRACTION } < spotsPerDay
+                (if (needMeal) nearby(d, PlaceType.RESTAURANT) else emptyList()).map { d to it } +
+                    (if (needSight) nearby(d, PlaceType.ATTRACTION) else emptyList()).map { d to it }
+            }.filter { (_, p) -> cost(p) <= gap }
+            // 평점 좋은 곳을 고르되, 예산을 남기도록 너무 비싼 곳은 피한다 (업그레이드는 다음 단계에서)
+            val (d, add) = missing.maxByOrNull { (_, p) -> p.rating - p.price / 50_000.0 } ?: break
+            days[d].add(add)
+        }
+
+        // ---- 남으면 더 좋은 곳으로 바꾼다 ----
+        for (step in 0 until FIT_MAX_STEPS) {
+            val gap = target() - spend()
+            if (gap <= budget * FIT_DONE_PCT / 100) break
+            var bestGain = 0L
+            var best: (() -> Unit)? = null
+            fun offer(gain: Long, action: () -> Unit) {
+                if (gain in 1..gap && gain > bestGain) {
+                    bestGain = gain
+                    best = action
+                }
+            }
+            lodging?.let { cur ->
+                lodgings.filter { it.price > cur.price }.forEach { up ->
+                    offer((up.price - cur.price).toLong() * nights) { lodging = up }
+                }
+            }
+            for (d in days.indices) {
+                val list = days[d]
+                val counted = countedRestaurants(d).toSet()
+                for (i in list.indices) {
+                    val p = list[i]
+                    if (p.id in mustIds || (p.type == PlaceType.RESTAURANT && p !in counted)) continue
+                    nearby(d, p.type)
+                        .filter { it.price > p.price && it.rating >= p.rating - FIT_RATING_SLACK }
+                        .forEach { alt -> offer((alt.price - p.price).toLong() * people) { list[i] = alt } }
+                }
+                if (list.count { it.type == PlaceType.ATTRACTION } < spotsPerDay) {
+                    nearby(d, PlaceType.ATTRACTION).filter { it.price > 0 }
+                        .forEach { add -> offer(cost(add)) { list.add(add) } }
+                }
+            }
+            val apply = best ?: break
+            apply()
+        }
+        log.info("예산 맞추기: 예산 {} → 장소 비용 {} (목표 {})", budget, spend(), target())
+        return lodging to days
+    }
+
     /** 하루 장소들이 모두 그 중심에서 DAY_SPREAD_M 안에 있는지 */
     private fun isCompact(places: List<Place>): Boolean {
         if (places.size < 2) return true
@@ -454,7 +598,7 @@ class PlanService(
             return list.filter { it.name !in names } + extra
         }
         return PlaceProviderService.Pool(
-            lodgings = base.lodgings,
+            lodgings = merge(base.lodgings, PlaceType.LODGING),
             restaurants = merge(base.restaurants, PlaceType.RESTAURANT),
             attractions = merge(base.attractions, PlaceType.ATTRACTION),
             source = base.source + "+PREF",
@@ -549,8 +693,9 @@ class PlanService(
         val cLng = center.longitude
 
         // 2) 필요한 만큼 모일 때까지 반경 확장
-        val needAttr = days * spotsPerDay
-        val needRest = days * 3
+        // 날짜별 동네로 나눌 때 날마다 여유분(ZONE_SPARE)도 잡으므로 그만큼 더 남긴다 (긴 여행에서 뒤쪽 날짜가 비지 않게)
+        val needAttr = days * (spotsPerDay + ZONE_SPARE)
+        val needRest = days * (3 + ZONE_SPARE)
         fun within(list: List<Place>, r: Double) = list.filter { dist(cLat, cLng, it) <= r }
         val radius = ZONE_RADII.firstOrNull { r ->
             within(pool.attractions, r).size >= needAttr && within(pool.restaurants, r).size >= needRest
@@ -742,9 +887,20 @@ class PlanService(
                 restaurants = pool.restaurants.filter { it.id !in used && dist(lat, lng, it) <= radius }
                 if (attractions.size >= spotsPerDay && restaurants.size >= 3) break
             }
-            fun top(list: List<Place>) =
-                list.sortedByDescending { it.rating - dist(lat, lng, it) / 1000.0 }.take(ZONE_CANDIDATES)
-            val zone = DayZone(lat, lng, top(attractions), top(restaurants))
+            // 그래도 모자라면(긴 여행 뒤쪽 날짜) 반경과 관계없이 가까운 남은 장소로 채운다 — 빈 날을 만들지 않는다
+            if (attractions.size < spotsPerDay) {
+                attractions = pool.attractions.filter { it.id !in used }.sortedBy { dist(lat, lng, it) }
+                    .take(spotsPerDay + ZONE_SPARE)
+            }
+            if (restaurants.size < 3) {
+                restaurants = pool.restaurants.filter { it.id !in used }.sortedBy { dist(lat, lng, it) }
+                    .take(3 + ZONE_SPARE)
+            }
+            // 하루에 쓸 만큼 + 여유분(ZONE_SPARE)만 그날 몫으로 잡는다. 많이 잡아 두면 긴 여행에서
+            // 뒤쪽 날짜에 남는 후보가 없어 빈 날이 생긴다 (예: 7일 여행의 6·7일차).
+            fun top(list: List<Place>, need: Int) =
+                list.sortedByDescending { it.rating - dist(lat, lng, it) / 1000.0 }.take(need + ZONE_SPARE)
+            val zone = DayZone(lat, lng, top(attractions, spotsPerDay), top(restaurants, 3))
             (zone.attractions + zone.restaurants).forEach { p -> p.id?.let(used::add) }
             zone
         }
@@ -871,10 +1027,26 @@ class PlanService(
         private const val HUB_RADIUS_M = 1500.0
         private const val HUB_MIN_GAP_M = 3000.0
         private val ZONE_RADII_M = listOf(1500.0, 2500.0, 4000.0) // 후보가 모자라면 넓혀 본다
-        private const val ZONE_CANDIDATES = 12   // 동네당 관광지·식당 후보 수 (AI 프롬프트 길이도 줄인다)
+        private const val ZONE_SPARE = 2         // 날마다 필요한 수보다 더 잡아 두는 후보 수 (교체·AI 선택 여유)
         private const val NEARBY_LODGINGS = 8
         private const val NEAR_REGION_M = 15_000.0  // 이 안이면 "그 지역에 와 있다"고 본다
         private const val PREF_SEARCH_LIMIT = 8       // 취향 검색어 수 (외부 API 호출 수)
+        private const val PREMIUM_PER_PERSON_DAY = 120_000L // 1인당 하루 예산이 이 이상이면 고급 장소도 찾는다
+
+        // 예산 맞추기
+        private const val FIT_TARGET_PCT = 96L        // 목표 = 예산의 96% − 예상 교통비 (실제 교통비 오차 여유)
+        private const val FIT_DONE_PCT = 3L           // 목표와의 차이가 예산의 3% 안이면 충분
+        private const val TRANSIT_EST_PER_LEG = 1_100L // 구간당 1인 교통비 추정 (도보 섞임 평균)
+        private const val FIT_RADIUS_M = 1_500.0      // 교체 후보는 그날 장소들 중심에서 이 안
+        private const val FIT_RATING_SLACK = 0.6      // 교체할 때 평점이 이만큼까지만 떨어져도 된다
+        private const val FIT_LODGING_OPTIONS = 15
+        private const val FIT_MAX_STEPS = 60
+        private val PREMIUM_SEARCHES = listOf(
+            Triple("오마카세", PlaceType.RESTAURANT, "고급 식당"),
+            Triple("한우", PlaceType.RESTAURANT, "고급 식당"),
+            Triple("호텔", PlaceType.LODGING, "호텔"),
+            Triple("체험", PlaceType.ATTRACTION, "유료 체험"),
+        )
         private const val DAY_SPREAD_M = 3_000.0      // AI 일정 검증: 하루 장소가 중심에서 이 안에 있어야 한다
         private const val PREF_RADIUS_M = 12_000.0    // 취향 검색 결과로 받을 거리
         private const val SCORE_JITTER = 0.8          // 장소 점수 무작위 폭 (평점 0.4점 정도)
@@ -889,7 +1061,7 @@ class PlanService(
         private val HHMM = DateTimeFormatter.ofPattern("HH:mm")
         private const val MEAL_MIN = 50          // 식사 시간
         private const val ATTRACTION_MIN = 60    // 관광지 이용 시간
-        private const val TRANSIT_WAIT_MIN = 7   // 버스 대기 시간(평균 배차 가정)
+        private val SEOUL: ZoneId = ZoneId.of("Asia/Seoul")
 
         /** 식사 슬롯 기준 시각: 아침 08:00 / 점심 12:00 / 저녁 17:00 */
         private val MEAL_SLOTS = listOf(
