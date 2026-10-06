@@ -8,6 +8,8 @@ object AuthDtos {
         val password: String = "",
         val passwordConfirm: String? = null,
         val nickname: String = "",
+        /** 메일 인증이 막혔을 때의 임시 가입 경로. 서버 INVITE_CODE 와 같으면 메일 인증을 건너뛴다 */
+        val inviteCode: String? = null,
     )
 
     /** 로그인 요청 */

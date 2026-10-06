@@ -73,6 +73,11 @@ fun SignupScreen(state: AppState) {
                 CodeField(auth, scope)
             }
 
+            if (!auth.emailVerified) {
+                Spacer(Modifier.height(16.dp))
+                InviteCodeField(auth)
+            }
+
             Spacer(Modifier.height(16.dp))
             NicknameField(auth)
 
@@ -183,6 +188,23 @@ private fun CodeField(auth: AuthState, scope: kotlinx.coroutines.CoroutineScope)
     auth.codeMessage?.let {
         FieldHint(it, isError = auth.codeMessageIsError, isOk = !auth.codeMessageIsError)
     }
+}
+
+/** 메일 인증이 안 될 때 쓰는 임시 경로 — 초대코드를 받은 사람은 이메일 인증을 건너뛴다 */
+@Composable
+private fun InviteCodeField(auth: AuthState) {
+    FieldLabel("초대코드 (선택)")
+    Spacer(Modifier.height(8.dp))
+    AuthTextField(
+        value = auth.signupInviteCode,
+        onValueChange = { auth.signupInviteCode = it.trim().take(32) },
+        placeholder = "받은 초대코드",
+    )
+    FieldHint(
+        text = if (auth.signupInviteCode.isBlank()) "초대코드가 있으면 이메일 인증 없이 가입할 수 있어요"
+        else "초대코드로 가입해요 — 이메일 인증은 건너뛰어요",
+        isOk = auth.signupInviteCode.isNotBlank(),
+    )
 }
 
 @Composable

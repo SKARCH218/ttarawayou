@@ -37,6 +37,9 @@ spring:
             enable: true
 
 trevit:
+  # 메일 인증이 막혔을 때 쓰는 임시 가입 초대코드. 비어 있으면(기본값) 이 경로는 꺼져 있다.
+  # 절대 저장소에 실제 값을 커밋하지 말 것 — 서버 환경변수로만 넣는다.
+  invite-code: ${INVITE_CODE:}
   mail:
     # 받는 사람에게 보이는 발신자. Gmail은 실제 계정 주소로 덮어써서 나갈 수 있다
     from: ${MAIL_FROM:트레빗 <no-reply@trevit.app>}

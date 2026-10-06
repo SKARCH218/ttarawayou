@@ -8,9 +8,11 @@ import com.trevit.entity.AuthToken
 import com.trevit.entity.User
 import com.trevit.repository.AuthTokenRepository
 import com.trevit.repository.UserRepository
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import java.security.MessageDigest
 import java.security.SecureRandom
 import java.time.Instant
 import java.time.temporal.ChronoUnit
@@ -31,6 +33,7 @@ class AuthService(
     private val tokens: AuthTokenRepository,
     private val emailVerification: EmailVerificationService,
     private val google: GoogleAuthService,
+    @Value("\${trevit.invite-code:}") private val inviteCode: String,
 ) {
     private val encoder = BCryptPasswordEncoder()
     private val random = SecureRandom()
@@ -52,8 +55,17 @@ class AuthService(
         require(!users.existsByEmail(email)) { "이미 가입된 이메일이에요." }
         require(!users.existsByNickname(nickname)) { "이미 사용 중인 닉네임이에요." }
 
-        // 메일 인증을 마친 이메일만 가입시킨다 (기록은 여기서 소비된다)
-        emailVerification.consumeVerified(email)
+        // 메일 인증을 마친 이메일만 가입시킨다 (기록은 여기서 소비된다).
+        // 발신 메일 계정이 막혔을 때를 위한 임시 경로: 서버에 INVITE_CODE 가 설정돼 있고
+        // 요청의 초대코드가 같으면 메일 인증을 건너뛴다. 코드가 틀리면 조용히 넘기지 않고 거절한다.
+        val given = req.inviteCode?.trim().orEmpty()
+        if (given.isNotEmpty()) {
+            require(inviteCode.isNotBlank() && MessageDigest.isEqual(given.toByteArray(), inviteCode.toByteArray())) {
+                "초대코드가 올바르지 않아요."
+            }
+        } else {
+            emailVerification.consumeVerified(email)
+        }
 
         val user = users.save(
             User(

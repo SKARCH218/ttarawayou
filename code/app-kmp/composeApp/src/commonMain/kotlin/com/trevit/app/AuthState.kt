@@ -44,6 +44,9 @@ class AuthState(
     var signupPassword by mutableStateOf("")
     var signupPasswordConfirm by mutableStateOf("")
     var signupCode by mutableStateOf("")
+
+    /** 메일 인증이 막혔을 때 쓰는 임시 가입 초대코드 — 입력하면 이메일 인증 없이 가입된다 */
+    var signupInviteCode by mutableStateOf("")
     var agreedToTerms by mutableStateOf(false)
 
     /** 인증코드를 보낸 뒤에만 코드 입력칸이 나타난다 */
@@ -233,7 +236,7 @@ class AuthState(
 
         val problem = when {
             !EMAIL_REGEX.matches(email) -> "이메일 형식이 올바르지 않아요."
-            !emailVerified -> "이메일 인증을 먼저 해주세요."
+            !emailVerified && signupInviteCode.isBlank() -> "이메일 인증을 먼저 하거나 초대코드를 입력해 주세요."
             nickname.length !in 2..12 -> "닉네임은 2~12자로 입력해 주세요."
             !isPasswordStrong(signupPassword) -> "비밀번호는 영문과 숫자를 섞어 8자 이상이어야 해요."
             signupPassword != signupPasswordConfirm -> "비밀번호가 서로 달라요."
@@ -253,6 +256,8 @@ class AuthState(
                     password = signupPassword,
                     passwordConfirm = signupPasswordConfirm,
                     nickname = nickname,
+                    // 메일 인증을 마쳤다면 초대코드는 보내지 않는다 (서버는 코드가 있으면 인증을 건너뛰기 때문)
+                    inviteCode = if (emailVerified) null else signupInviteCode.trim().ifBlank { null },
                 ),
             )
             saveSession(auth.token, auth.user)
@@ -289,6 +294,7 @@ class AuthState(
         signupPassword = ""
         signupPasswordConfirm = ""
         signupCode = ""
+        signupInviteCode = ""
         agreedToTerms = false
         codeSent = false
         verifiedEmail = null

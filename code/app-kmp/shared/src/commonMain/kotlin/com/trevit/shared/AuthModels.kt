@@ -14,6 +14,7 @@ data class SignupRequest(
     val password: String,
     val passwordConfirm: String? = null,
     val nickname: String,
+    val inviteCode: String? = null,
 )
 
 /** POST /api/auth/login */
