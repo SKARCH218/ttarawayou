@@ -28,7 +28,9 @@ class PlanRepository(
             setBody(request)
         }
         if (!response.status.isSuccess()) {
-            throw PlanApiException("서버 오류 (${response.status.value})")
+            // 백엔드는 400에 {"message":"보유 토큰이 부족합니다 …"} 같은 이유를 준다. 못 읽으면 상태코드로 대체
+            val message = runCatching { response.body<ApiErrorDto>().message }.getOrNull()
+            throw PlanApiException(message ?: "서버 오류 (${response.status.value})")
         }
         return response.body()
     }

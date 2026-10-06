@@ -59,9 +59,11 @@ class AiPlanService(
             }
             // 교통비 몫(예산의 10%)을 남겨야 하므로 장소 비용은 90%까지만 허용.
             // 예산을 최대한 쓰는 것이 목표이므로 70% 미만으로 아끼면 휴리스틱이 낫다.
+            // 단, 후보 장소가 구역 안으로 좁혀져 있어 가장 비싼 것만 골라도 70%에 못 미칠 수 있다.
+            // 그때는 "후보로 쓸 수 있는 최대 금액"의 60%를 하한으로 삼는다.
             val total = totalCost(sel, people, nights)
             val placeCap = budget * 90 / 100
-            val placeFloor = budget * 70 / 100
+            val placeFloor = minOf(budget * 70 / 100, maxReachableCost(places, days, people, nights) * 60 / 100)
             if (total > placeCap || total < placeFloor) {
                 log.warn("AI 플랜 장소 비용 {}이 허용 범위({}~{}) 밖 → 휴리스틱 폴백", total, placeFloor, placeCap)
                 return null
@@ -105,13 +107,20 @@ class AiPlanService(
             .append("- 식당과 관광지를 번갈아 배치하라 (아침식사로 시작하면 자연스럽다). ")
             .append("식당 두 곳을 연속으로 배치하는 것은 절대 금지\n")
             .append("- 같은 장소를 두 번 넣지 마라\n")
-            .append("- 중요: 예산을 최대한 다 써라. 장소 비용 합계(숙박+입장료x인원+식비x인원)가 ")
-            .append("총예산의 75% 이상 88% 이하가 되도록 더 비싸고 평점 좋은 숙소·식당·관광지를 우선 선택하라. ")
-            .append("남는 예산을 최소화하라. 나머지는 교통비로 자동 사용되므로 88%는 절대 초과하지 마라\n")
-        // 여행자가 앱을 쓰는 언어로 reason 을 쓰게 한다 (장소 이름은 목록의 원래 이름 그대로)
+        if (maxReachableCost(places, days, people, nights) < budget * 75 / 100) {
+            // 구역 안 후보가 저렴해서 목록을 다 써도 75%에 못 미친다 — 불가능한 목표를 주지 않는다
+            sb.append("- 예산이 넉넉하다. 목록 안에서 평점 좋고 더 비싼 숙소·식당·관광지를 우선 선택하라. ")
+                .append("장소 비용 합계는 총예산의 88%를 넘지 마라\n")
+        } else {
+            sb.append("- 중요: 예산을 최대한 다 써라. 장소 비용 합계(숙박+입장료x인원+식비x인원)가 ")
+                .append("총예산의 75% 이상 88% 이하가 되도록 더 비싸고 평점 좋은 숙소·식당·관광지를 우선 선택하라. ")
+                .append("남는 예산을 최소화하라. 나머지는 교통비로 자동 사용되므로 88%는 절대 초과하지 마라\n")
+        }
+        // 여행자가 앱을 쓰는 언어로 reason 을 쓰게 한다. 장소는 도착 전까지 비밀이라 이름은 쓰지 않는다
         val reasonLang = languageName(profile.language)
-        sb.append("- reason 은 반드시 ").append(reasonLang).append("로 작성하라. 다른 언어를 섞지 마라. ")
-            .append("단, 장소 이름은 목록에 적힌 이름을 그대로 써라\n\n")
+        sb.append("- reason 은 반드시 ").append(reasonLang).append("로 작성하라. 다른 언어를 섞지 마라\n")
+            .append("- reason 은 여행자에게 그대로 보여 주는 친근한 설명이다. 장소 이름은 쓰지 말고(도착 전까지 비밀이다) ")
+            .append("동선과 취향 반영만 이야기하라. 금액·예산 비율·규칙 충족 여부·제약 사항은 절대 언급하지 마라\n\n")
             .append("반드시 아래 형식의 JSON 하나만 출력하라. 설명·주석 금지.\n")
             .append("{\"lodgingId\": 숫자, \"days\": [{\"stopIds\": [숫자, ...]}")
         sb.append(", ...], \"reason\": \"이 여행자 프로필에 맞춰 왜 이렇게 계획했는지 ")
@@ -264,5 +273,13 @@ class AiPlanService(
             for (p in day) total += p.price.toLong() * people
         }
         return total
+    }
+
+    /** 후보 목록으로 낼 수 있는 최대 장소 비용 — 가장 비싼 숙소 + 하루 관광지 3곳·식당 3곳씩 비싼 순 */
+    private fun maxReachableCost(places: List<Place>, days: Int, people: Int, nights: Int): Long {
+        fun top(type: PlaceType, n: Int) =
+            places.filter { it.type == type }.map { it.price.toLong() }.sortedDescending().take(n).sum()
+        val lodging = if (nights > 0) top(PlaceType.LODGING, 1) * nights else 0L
+        return lodging + (top(PlaceType.ATTRACTION, days * 3) + top(PlaceType.RESTAURANT, days * 3)) * people
     }
 }
