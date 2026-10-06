@@ -17,11 +17,12 @@ data class PlanRequest(
     val gender: String? = null,          // MALE | FEMALE
     val ageGroup: String? = null,        // 예: "10대"
     val mbti: String? = null,            // 예: "INFP"
-    val purpose: String? = null,         // 휴양 | 관광 | 미식 | 액티비티
-    val foodPreference: String? = null,  // 한식 | 양식 | 일식 | 중식
+    val purpose: String? = null,         // 휴양 | 관광 | 미식 | 액티비티 (여러 개면 ", "로 연결)
+    val foodPreference: String? = null,  // 한식 | 양식 | 일식 | 중식 (여러 개면 ", "로 연결)
     val avoidWalking: Boolean? = null,
     val keywords: List<String>? = null,  // 예: ["바다","공원"]
     val preferenceNote: String? = null,  // 자유 서술 취향 메모
+    val mustVisit: List<String>? = null, // 꼭 가고 싶은 장소 이름
     val startLatitude: Double? = null,
     val startLongitude: Double? = null,
 )

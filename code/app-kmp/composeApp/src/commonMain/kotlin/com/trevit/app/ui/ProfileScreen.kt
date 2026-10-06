@@ -55,6 +55,7 @@ import com.trevit.app.AppState
 import com.trevit.app.FOOD_PREFS
 import com.trevit.app.GENDER_OPTIONS
 import com.trevit.app.KEYWORD_OPTIONS
+import com.trevit.app.MAX_MUST_VISIT
 import com.trevit.app.PURPOSES
 import com.trevit.app.ProfileQuestion
 import com.trevit.app.WALKING_OPTIONS
@@ -108,11 +109,10 @@ fun ProfileScreen(state: AppState) {
             val question = ProfileQuestion.ordered[index]
             QuestionPage(question) {
                 when (question) {
-                    ProfileQuestion.Purpose -> SingleChoiceCustom(
+                    ProfileQuestion.Purpose -> MultiChoiceCustom(
                         options = PURPOSES,
-                        selected = state.purpose,
-                        onSelectPreset = { state.purpose = it },
-                        onCustomChange = { state.purpose = it.ifBlank { null } },
+                        selected = state.purposes,
+                        onToggle = state::togglePurpose,
                         customPlaceholder = "원하는 여행 유형을 입력하세요",
                     )
 
@@ -139,11 +139,10 @@ fun ProfileScreen(state: AppState) {
 
                     ProfileQuestion.Mbti -> MbtiChoice(state)
 
-                    ProfileQuestion.Food -> SingleChoiceCustom(
+                    ProfileQuestion.Food -> MultiChoiceCustom(
                         options = FOOD_PREFS,
-                        selected = state.foodPreference,
-                        onSelectPreset = { state.foodPreference = it },
-                        onCustomChange = { state.foodPreference = it.ifBlank { null } },
+                        selected = state.foodPreferences,
+                        onToggle = state::toggleFood,
                         customPlaceholder = "좋아하는 음식을 입력하세요",
                     )
 
@@ -153,6 +152,8 @@ fun ProfileScreen(state: AppState) {
                         onToggle = state::toggleKeyword,
                         customPlaceholder = "가고 싶은 곳을 입력하세요",
                     )
+
+                    ProfileQuestion.MustVisit -> MustVisitInput(state)
 
                     ProfileQuestion.Walking -> SingleChoice(
                         options = WALKING_OPTIONS,
@@ -190,10 +191,10 @@ private fun QuestionNav(state: AppState) {
         question == ProfileQuestion.Food ||
         question == ProfileQuestion.Walking
     val answered = when (question) {
-        ProfileQuestion.Purpose -> state.purpose != null
+        ProfileQuestion.Purpose -> state.purposes.isNotEmpty()
         ProfileQuestion.Gender -> state.gender != null || state.genderNotSpecified
         ProfileQuestion.AgeGroup -> state.ageGroup != null
-        ProfileQuestion.Food -> state.foodPreference != null
+        ProfileQuestion.Food -> state.foodPreferences.isNotEmpty()
         ProfileQuestion.Walking -> state.walkingAnswered
         else -> true
     }
@@ -319,48 +320,44 @@ private fun MultiChoice(
     }
 }
 
-/**
- * 단일 선택 + "기타" 직접 입력. 프리셋을 고르면 기존처럼 자동으로 다음으로 넘어가고,
- * "기타"를 고르면 입력창이 열려 원하는 값을 직접 적은 뒤 [다음]으로 넘어간다.
- */
+/** 꼭 가고 싶은 곳 — 이름을 적어 추가하고, 칩을 누르면 뺀다 (선택 질문) */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun SingleChoiceCustom(
-    options: List<String>,
-    selected: String?,
-    onSelectPreset: (String) -> Unit,
-    onCustomChange: (String) -> Unit,
-    customPlaceholder: String,
-) {
-    // 선택값이 프리셋에 없으면(=사용자 입력) 기타 모드로 본다
-    var customMode by remember { mutableStateOf(selected != null && selected !in options) }
+private fun MustVisitInput(state: AppState) {
+    var draft by remember { mutableStateOf("") }
+    val add = {
+        state.addMustVisit(draft)
+        draft = ""
+    }
     Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-        FlowRow(
-            Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(9.dp, Alignment.CenterHorizontally),
-            verticalArrangement = Arrangement.spacedBy(9.dp),
-            maxItemsInEachRow = 4,
-        ) {
-            options.forEach { option ->
-                WebChip(option, !customMode && selected == option, {
-                    customMode = false
-                    onSelectPreset(option)
-                })
+        if (state.mustVisit.isNotEmpty()) {
+            FlowRow(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(9.dp, Alignment.CenterHorizontally),
+                verticalArrangement = Arrangement.spacedBy(9.dp),
+            ) {
+                state.mustVisit.toList().forEach { name ->
+                    WebChip("$name  ✕", true, { state.mustVisit.remove(name) })
+                }
             }
-            WebChip("기타", customMode, {
-                customMode = true
-                if (selected == null || selected in options) onCustomChange("")
-            })
-        }
-        if (customMode) {
             Spacer(Modifier.height(12.dp))
-            // 입력만 받고, 진행은 하단 공통 [다음] 버튼으로 통일
+        }
+        if (state.mustVisit.size < MAX_MUST_VISIT) {
             CustomInputField(
-                value = if (selected != null && selected !in options) selected else "",
-                onValueChange = onCustomChange,
-                placeholder = customPlaceholder,
-                onSubmit = {},
+                value = draft,
+                onValueChange = { draft = it },
+                placeholder = "예: 경복궁, 광장시장",
+                onSubmit = add,
             )
+            Spacer(Modifier.height(10.dp))
+            PrimaryCta(
+                text = "추가",
+                enabled = draft.isNotBlank(),
+                onClick = add,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        } else {
+            Text("최대 ${MAX_MUST_VISIT}곳까지 넣을 수 있어요", fontSize = 13.sp, color = webTextFaint())
         }
     }
 }

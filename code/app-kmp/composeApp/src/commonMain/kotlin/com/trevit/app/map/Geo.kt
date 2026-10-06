@@ -56,6 +56,30 @@ class LegGeometry(val leg: LegDto, from: StopDto, to: StopDto) {
         return (aLat + (bLat - aLat) * t) to (aLng + (bLng - aLng) * t)
     }
 
+    /** 좌표를 경로 위 가장 가까운 지점으로 투영해, 시작으로부터의 거리(m)를 돌려준다 */
+    fun project(lat: Double, lng: Double): Double {
+        val mPerDegLat = 111_320.0
+        val mPerDegLng = 111_320.0 * cos(toRadians(lat))
+        var bestDist = Double.MAX_VALUE
+        var bestAlong = 0.0
+        for (i in 1 until points.size) {
+            val (aLat, aLng) = points[i - 1]
+            val (bLat, bLng) = points[i]
+            val ax = (aLng - lng) * mPerDegLng; val ay = (aLat - lat) * mPerDegLat
+            val bx = (bLng - lng) * mPerDegLng; val by = (bLat - lat) * mPerDegLat
+            val dx = bx - ax; val dy = by - ay
+            val len2 = dx * dx + dy * dy
+            val t = if (len2 < 1e-9) 0.0 else (-(ax * dx + ay * dy) / len2).coerceIn(0.0, 1.0)
+            val px = ax + dx * t; val py = ay + dy * t
+            val d = px * px + py * py
+            if (d < bestDist) {
+                bestDist = d
+                bestAlong = cumulative[i - 1] + (cumulative[i] - cumulative[i - 1]) * t
+            }
+        }
+        return bestAlong
+    }
+
     /** dist 지점까지의 부분 경로 (지나온 경로 그리기용) */
     fun subPathTo(dist: Double): List<Pair<Double, Double>> {
         if (dist <= 0) return listOf(points.first())

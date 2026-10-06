@@ -42,12 +42,13 @@ enum class ProfileQuestion(
     val hint: String? = null,
     val wide: Boolean = false,
 ) {
-    Purpose("🧭", "어떤 여행을 원하세요?"),
+    Purpose("🧭", "어떤 여행을 원하세요?", "여러 개 고를 수 있어요"),
     Gender("🙂", "성별을 알려주세요", "취향이 비슷한 여행자의 코스를 참고해요", wide = true),
     AgeGroup("🎂", "연령대는 어떻게 되세요?"),
     Mbti("🧩", "MBTI를 알려주세요", "모르면 건너뛰어도 괜찮아요"),
-    Food("🍚", "어떤 음식을 좋아하세요?"),
+    Food("🍚", "어떤 음식을 좋아하세요?", "여러 개 고를 수 있어요"),
     Places("🏞️", "어떤 곳에 가고 싶으세요?", "여러 개 고를 수 있어요"),
+    MustVisit("📍", "꼭 가고 싶은 곳이 있나요?", "장소 이름을 적으면 일정에 꼭 넣어 드려요 (최대 5곳)"),
     Walking("🚶", "많이 걷는 건 괜찮으세요?", wide = true),
     Note("💬", "더 알려주실 취향이 있나요?", "AI가 장소를 고를 때 참고해요"),
     ;
@@ -68,6 +69,8 @@ val FOOD_PREFS = listOf("한식", "양식", "일식", "중식", "상관없음")
 val KEYWORD_OPTIONS = listOf("산", "바다", "공원", "강")
 val GENDER_OPTIONS = listOf("남", "여", "선택 안 함")
 val WALKING_OPTIONS = listOf("괜찮아요", "적게 걷고 싶어요")
+const val NO_FOOD_PREFERENCE = "상관없음"
+const val MAX_MUST_VISIT = 5
 
 /** 웹 `js/setup.js` 와 같은 예산 한계 */
 const val MIN_BUDGET = 50_000L
@@ -95,10 +98,13 @@ class AppState(
     var errorMessage by mutableStateOf<String?>(null)
     var completedDays by mutableIntStateOf(0)
 
+    /** 여정 지도 음성 안내 켜짐 여부 */
+    var voiceEnabled by mutableStateOf(true)
+
     // ---- 여행 설정 (웹 index.html + setup.js 와 같은 항목·한계) ----
     // 웹 select 의 첫 항목이 서울이라 앱도 같은 기본값에서 출발한다
     var region by mutableStateOf<String?>(REGIONS.first())
-    var purpose by mutableStateOf<String?>(null)
+    val purposes = mutableStateListOf<String>()
     var budget by mutableStateOf(300_000L)
     var days by mutableIntStateOf(2)            // 1~3일
     var people by mutableIntStateOf(1)          // 1~4명
@@ -201,9 +207,10 @@ class AppState(
     var mbtiSN by mutableStateOf<Char?>(null)
     var mbtiTF by mutableStateOf<Char?>(null)
     var mbtiJP by mutableStateOf<Char?>(null)
-    var foodPreference by mutableStateOf<String?>(null)
+    val foodPreferences = mutableStateListOf<String>()
     var avoidWalking by mutableStateOf(false)
     val keywords = mutableStateListOf<String>()
+    val mustVisit = mutableStateListOf<String>()
     var preferenceNote by mutableStateOf("")
 
     // ---- 프로필 설문 진행 상태 ----
@@ -252,6 +259,22 @@ class AppState(
         if (!keywords.remove(keyword)) keywords.add(keyword)
     }
 
+    fun togglePurpose(purpose: String) {
+        if (!purposes.remove(purpose)) purposes.add(purpose)
+    }
+
+    /** "상관없음"은 다른 음식과 함께 고를 수 없다 — 고르면 나머지를 비우고, 다른 걸 고르면 빠진다 */
+    fun toggleFood(food: String) {
+        if (foodPreferences.remove(food)) return
+        if (food == NO_FOOD_PREFERENCE) foodPreferences.clear() else foodPreferences.remove(NO_FOOD_PREFERENCE)
+        foodPreferences.add(food)
+    }
+
+    fun addMustVisit(name: String) {
+        val t = name.trim()
+        if (t.isNotEmpty() && t !in mustVisit && mustVisit.size < MAX_MUST_VISIT) mustVisit.add(t)
+    }
+
     private fun buildRequest(startLat: Double? = null, startLng: Double? = null) = PlanRequest(
         budget = budget,
         days = days,
@@ -264,11 +287,12 @@ class AppState(
         },
         ageGroup = ageGroup,
         mbti = mbtiOrNull,
-        purpose = purpose,
-        foodPreference = foodPreference?.takeIf { it != "상관없음" },
+        purpose = purposes.joinToString(", ").ifEmpty { null },
+        foodPreference = foodPreferences.filter { it != NO_FOOD_PREFERENCE }.joinToString(", ").ifEmpty { null },
         avoidWalking = avoidWalking,
         keywords = keywords.toList().ifEmpty { null },
         preferenceNote = preferenceNote.trim().ifBlank { null },
+        mustVisit = mustVisit.toList().ifEmpty { null },
         // 현재 위치가 있으면 1일차를 현재 위치에서 출발시킨다 (없으면 백엔드가 숙소 출발로 폴백)
         startLatitude = startLat,
         startLongitude = startLng,
