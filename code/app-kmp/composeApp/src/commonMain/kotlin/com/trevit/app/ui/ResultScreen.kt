@@ -27,9 +27,9 @@ import androidx.compose.ui.unit.sp
 import com.trevit.app.AppState
 import com.trevit.app.resources.*
 import com.trevit.app.Screen
-import com.trevit.app.comma
 import com.trevit.app.oneDecimal
-import com.trevit.app.won
+import com.trevit.app.i18n.tokens
+import com.trevit.app.i18n.tr
 import com.trevit.shared.DayPlanDto
 
 /**
@@ -56,12 +56,12 @@ fun ResultScreen(state: AppState) {
                 .height(47.dp),
         )
         Spacer(Modifier.height(6.dp))
-        GradientTitle("플랜 완성")
+        GradientTitle(tr("result.title"))
         Spacer(Modifier.height(10.dp))
-        WebSubtitle("장소는 도착할 때 공개돼요")
+        WebSubtitle(tr("result.subtitle"))
         Spacer(Modifier.height(6.dp))
         WebSubtitle(
-            if (plan.plannedBy == "AI") "AI가 설계한 플랜" else "알고리즘이 설계한 플랜",
+            if (plan.plannedBy == "AI") tr("result.plannedByAi") else tr("result.plannedByAlgo"),
             color = webTextFaint(),
             fontSize = 12.sp,
         )
@@ -70,7 +70,7 @@ fun ResultScreen(state: AppState) {
         plan.aiReason?.takeIf { it.isNotBlank() }?.let { reason ->
             Spacer(Modifier.height(16.dp))
             TrevitCard(Modifier.fillMaxWidth()) {
-                Text("AI의 한마디", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = webTextChip())
+                Text(tr("result.aiNote"), fontSize = 13.sp, fontWeight = FontWeight.Bold, color = webTextChip())
                 Spacer(Modifier.height(4.dp))
                 Text(reason, fontSize = 13.sp, lineHeight = 21.sp, color = webTextChip())
             }
@@ -79,25 +79,25 @@ fun ResultScreen(state: AppState) {
         // ---- 비용 요약 (웹 `.cost-row` 4줄) ----
         Spacer(Modifier.height(16.dp))
         TrevitCard(Modifier.fillMaxWidth()) {
-            CostRow("총 예산", won(plan.budget), webText())
+            CostRow(tr("result.totalBudget"), tokens(plan.budget), webText())
             DashedDivider()
-            CostRow("예상 총비용", won(plan.totalCost), WebPurple, valueSize = 23.sp)
+            CostRow(tr("result.estimatedCost"), tokens(plan.totalCost), WebPurple, valueSize = 23.sp)
             DashedDivider()
-            CostRow("남는 예산", won(plan.remainingBudget), WebMint)
+            CostRow(tr("result.remainingBudget"), tokens(plan.remainingBudget), WebMint)
             DashedDivider()
-            CostRow("남은 토큰", "${comma(plan.tokenBalance)} 토큰", WebOrange)
+            CostRow(tr("result.tokenBalance"), tokens(plan.tokenBalance), WebOrange)
         }
 
         // ---- 예산 배분 사용률 (웹 `.bar-group`) ----
         Spacer(Modifier.height(16.dp))
         TrevitCard(Modifier.fillMaxWidth()) {
-            Text("예산 배분 사용률", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = webTextLabel())
+            Text(tr("result.budgetUsage"), fontSize = 13.sp, fontWeight = FontWeight.Bold, color = webTextLabel())
             val b = plan.breakdown
             // 웹 팔레트: 숙박=퍼플 · 관광=민트 · 식비=오렌지 · 교통=블루
-            BudgetBarRow("숙박", b.lodgingSpent, b.lodgingBudget, WebPurple)
-            BudgetBarRow("관광", b.attractionSpent, b.attractionBudget, WebMint)
-            BudgetBarRow("식비", b.foodSpent, b.foodBudget, WebOrange)
-            BudgetBarRow("교통", b.transportSpent, b.transportBudget, WebBlue)
+            BudgetBarRow(tr("result.lodging"), b.lodgingSpent, b.lodgingBudget, WebPurple)
+            BudgetBarRow(tr("result.attraction"), b.attractionSpent, b.attractionBudget, WebMint)
+            BudgetBarRow(tr("result.food"), b.foodSpent, b.foodBudget, WebOrange)
+            BudgetBarRow(tr("result.transport"), b.transportSpent, b.transportBudget, WebBlue)
         }
 
         // ---- Day 버튼 (웹 `.day-list`) ----
@@ -109,7 +109,7 @@ fun ResultScreen(state: AppState) {
         }
 
         Spacer(Modifier.height(18.dp))
-        GhostButton("← 처음부터 다시", { state.resetPlan() }, Modifier.fillMaxWidth())
+        GhostButton(tr("result.restart"), { state.resetPlan() }, Modifier.fillMaxWidth())
     }
 }
 
@@ -129,15 +129,15 @@ private fun DayEntry(state: AppState, day: DayPlanDto, index: Int) {
 
     DayButton(
         badge = when {
-            locked -> "잠김"
-            completed -> "완료"
+            locked -> tr("result.badgeLocked")
+            completed -> tr("result.badgeDone")
             else -> "D${day.day}"
         },
-        title = "Day ${day.day} 여정 ${if (completed) "(완료)" else "따라가기"}",
+        title = if (completed) tr("result.dayTitleDone", day.day) else tr("result.dayTitleFollow", day.day),
         info = when {
-            completed -> "완료한 여정 · 다시 보기"
-            locked -> "Day ${day.day - 1} 완료 후 열려요 · $startAt 시작 예정"
-            else -> "$startAt 시작 · 비밀 장소 ${mysterySpots}곳 · 이동 약 ${totalMinutes}분 · ${won(day.dayCost)}"
+            completed -> tr("result.dayInfoDone")
+            locked -> tr("result.dayInfoLocked", day.day - 1, startAt)
+            else -> tr("result.dayInfo", startAt, mysterySpots, totalMinutes, tokens(day.dayCost))
         },
         locked = locked,
         onClick = { state.screen = Screen.Journey(index) },
@@ -164,7 +164,7 @@ private fun BudgetBarRow(label: String, spent: Long, budget: Long, color: Color)
     ) {
         Text(label, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = webTextMuted())
         Text(
-            "${won(spent)} / ${won(budget)}",
+            "${tokens(spent)} / ${tokens(budget)}",
             fontSize = 12.sp,
             fontWeight = FontWeight.SemiBold,
             color = webTextMuted(),

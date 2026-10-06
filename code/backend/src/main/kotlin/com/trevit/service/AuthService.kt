@@ -1,6 +1,9 @@
 package com.trevit.service
 
 import com.trevit.dto.AuthDtos.AuthResponse
+import com.trevit.dto.AuthDtos.ChangeNicknameRequest
+import com.trevit.dto.AuthDtos.ChangePasswordRequest
+import com.trevit.dto.AuthDtos.WithdrawRequest
 import com.trevit.dto.AuthDtos.LoginRequest
 import com.trevit.dto.AuthDtos.SignupRequest
 import com.trevit.dto.AuthDtos.UserResponse
@@ -154,6 +157,50 @@ class AuthService(
         if (raw.isNotEmpty()) tokens.deleteById(raw)
     }
 
+    // ---------- 계정 설정 (앱 설정 화면) ----------
+
+    /** 비밀번호 변경 — 현재 비밀번호 확인 후 교체. 다른 기기 로그인은 그대로 둔다 */
+    @Transactional
+    fun changePassword(authorization: String?, req: ChangePasswordRequest) {
+        val user = requireUserEntity(authorization)
+        require(user.passwordHash != null) { "구글로 가입한 계정은 비밀번호를 바꿀 수 없어요." }
+        require(encoder.matches(req.currentPassword, user.passwordHash)) { "현재 비밀번호가 올바르지 않아요." }
+        validatePassword(req.newPassword)
+        user.passwordHash = encoder.encode(req.newPassword)
+        users.save(user)
+    }
+
+    /** 닉네임 변경 — 가입 때와 같은 규칙(2~12자, 중복 불가) */
+    @Transactional
+    fun changeNickname(authorization: String?, req: ChangeNicknameRequest): UserResponse {
+        val user = requireUserEntity(authorization)
+        val nickname = req.nickname.trim()
+        require(nickname.length in 2..12) { "닉네임은 2~12자로 입력해 주세요." }
+        if (nickname != user.nickname) {
+            require(!users.existsByNickname(nickname)) { "이미 사용 중인 닉네임이에요." }
+            user.nickname = nickname
+            users.save(user)
+        }
+        return user.toResponse()
+    }
+
+    /** 회원 탈퇴 — 이메일 가입자는 비밀번호 확인. 계정과 모든 로그인 세션을 삭제한다 */
+    @Transactional
+    fun withdraw(authorization: String?, req: WithdrawRequest) {
+        val user = requireUserEntity(authorization)
+        if (user.passwordHash != null) {
+            require(encoder.matches(req.password.orEmpty(), user.passwordHash)) { "비밀번호가 올바르지 않아요." }
+        }
+        tokens.deleteByUserId(user.id!!)
+        users.delete(user)
+    }
+
+    /** Authorization 헤더 → 회원 엔티티 (수정용). 실패하면 401 */
+    private fun requireUserEntity(authorization: String?): User {
+        val id = requireUser(authorization).id
+        return users.findById(id).orElseThrow { UnauthorizedException("탈퇴했거나 없는 계정이에요.") }
+    }
+
     private fun validatePassword(password: String) {
         require(password.length >= 8) { "비밀번호는 8자 이상이어야 해요." }
         require(password.length <= 64) { "비밀번호는 64자 이하로 입력해 주세요." }
@@ -174,5 +221,6 @@ class AuthService(
         return value
     }
 
-    private fun User.toResponse() = UserResponse(id = id!!, email = email, nickname = nickname)
+    private fun User.toResponse() =
+        UserResponse(id = id!!, email = email, nickname = nickname, provider = provider.name)
 }

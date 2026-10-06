@@ -1,6 +1,8 @@
 package com.trevit.app.map
 
 import androidx.compose.ui.geometry.Offset
+import com.trevit.app.i18n.AppLanguage
+import com.trevit.app.i18n.translate
 import com.trevit.shared.LegDto
 import com.trevit.shared.StopDto
 import kotlin.math.PI
@@ -121,11 +123,14 @@ fun stopEmoji(type: String?): String = when (type) {
     else -> "✨"
 }
 
-/** 장소 유형 → 한글 라벨 */
-fun stopTypeLabel(type: String?): String = when (type) {
-    "LODGING" -> "숙소"
-    "RESTAURANT" -> "맛집"
-    "ATTRACTION" -> "관광지"
-    "START" -> "출발지"
-    else -> "미스터리"
-}
+/** 장소 유형 → 화면 언어 라벨 */
+fun stopTypeLabel(type: String?, lang: AppLanguage = AppLanguage.KO): String = translate(
+    lang,
+    when (type) {
+        "LODGING" -> "geo.lodging"
+        "RESTAURANT" -> "geo.restaurant"
+        "ATTRACTION" -> "geo.attraction"
+        "START" -> "geo.start"
+        else -> "geo.mystery"
+    },
+)

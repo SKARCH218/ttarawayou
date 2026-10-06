@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.dp
 import com.trevit.app.AppState
 import com.trevit.app.resources.*
 import com.trevit.app.Screen
+import com.trevit.app.i18n.tr
 import kotlinx.coroutines.launch
 
 /**
@@ -38,14 +39,14 @@ fun LoginScreen(state: AppState) {
         // 웹 `.auth-screen .brand-logo { width: 104px }` — 원본 비율 94:58
         Icon(
             painter = painterResource(Res.drawable.ic_travit_symbol),
-            contentDescription = "트레빗",
+            contentDescription = tr("auth.brand"),
             tint = BrandMint,
             modifier = Modifier.width(104.dp).height(64.dp),
         )
 
         Spacer(Modifier.height(12.dp))
-        GradientTitle("다시 만나서 반가워요")
-        WebSubtitle("오늘은 어디로 떠나볼까요?", modifier = Modifier.padding(top = 10.dp))
+        GradientTitle(tr("auth.login.title"))
+        WebSubtitle(tr("auth.login.subtitle"), modifier = Modifier.padding(top = 10.dp))
 
         LoginCard(state, passwordVisible) { passwordVisible = !passwordVisible }
 
@@ -53,7 +54,7 @@ fun LoginScreen(state: AppState) {
 
         Spacer(Modifier.height(16.dp))
         PrimaryCta(
-            text = if (auth.busy) "로그인 중…" else "로그인",
+            text = if (auth.busy) tr("auth.login.busy") else tr("auth.login.button"),
             enabled = !auth.busy,
             onClick = {
                 scope.launch {
@@ -63,7 +64,7 @@ fun LoginScreen(state: AppState) {
             modifier = Modifier.fillMaxWidth(),
         )
 
-        AuthSwitchRow("아직 계정이 없나요?", "회원가입") {
+        AuthSwitchRow(tr("auth.login.noAccount"), tr("auth.login.toSignup")) {
             auth.errorMessage = null
             state.screen = Screen.Signup
         }
@@ -74,7 +75,7 @@ fun LoginScreen(state: AppState) {
 private fun LoginCard(state: AppState, passwordVisible: Boolean, onToggleVisible: () -> Unit) {
     val auth = state.auth
     TrevitCard(Modifier.fillMaxWidth().padding(top = 16.dp)) {
-        FieldLabel("이메일")
+        FieldLabel(tr("auth.field.email"))
         Spacer(Modifier.height(8.dp))
         AuthTextField(
             value = auth.loginEmail,
@@ -85,12 +86,12 @@ private fun LoginCard(state: AppState, passwordVisible: Boolean, onToggleVisible
 
         Spacer(Modifier.height(16.dp))
 
-        FieldLabel("비밀번호")
+        FieldLabel(tr("auth.field.password"))
         Spacer(Modifier.height(8.dp))
         AuthTextField(
             value = auth.loginPassword,
             onValueChange = { auth.loginPassword = it },
-            placeholder = "비밀번호",
+            placeholder = tr("auth.field.password"),
             keyboardType = KeyboardType.Password,
             visualTransformation = if (passwordVisible) VisualTransformation.None else passwordMask,
             trailing = { PasswordToggle(passwordVisible, onToggleVisible) },

@@ -24,6 +24,8 @@ data class PlanRequest(
     val preferenceNote: String? = null,  // 자유 서술 취향 메모
     val startLatitude: Double? = null,
     val startLongitude: Double? = null,
+    /** 화면 언어 (ko | en | ja | zh) — AI 설명·플랜 설명 문구를 이 언어로 쓴다 */
+    val language: String? = null,
 )
 
 /** GET /api/wallet · POST /api/wallet/reset · POST /api/wallet/purchase 응답 */

@@ -58,6 +58,8 @@ import com.trevit.app.KEYWORD_OPTIONS
 import com.trevit.app.PURPOSES
 import com.trevit.app.ProfileQuestion
 import com.trevit.app.WALKING_OPTIONS
+import com.trevit.app.i18n.optLabel
+import com.trevit.app.i18n.tr
 import kotlinx.coroutines.delay
 
 /** 웹 `setTimeout(next, 180)` — 고른 걸 눈으로 확인할 만큼의 여유 */
@@ -113,7 +115,7 @@ fun ProfileScreen(state: AppState) {
                         selected = state.purpose,
                         onSelectPreset = { state.purpose = it },
                         onCustomChange = { state.purpose = it.ifBlank { null } },
-                        customPlaceholder = "원하는 여행 유형을 입력하세요",
+                        customPlaceholder = tr("profile.purposePlaceholder"),
                     )
 
                     ProfileQuestion.Gender -> SingleChoice(
@@ -144,14 +146,14 @@ fun ProfileScreen(state: AppState) {
                         selected = state.foodPreference,
                         onSelectPreset = { state.foodPreference = it },
                         onCustomChange = { state.foodPreference = it.ifBlank { null } },
-                        customPlaceholder = "좋아하는 음식을 입력하세요",
+                        customPlaceholder = tr("profile.foodPlaceholder"),
                     )
 
                     ProfileQuestion.Places -> MultiChoiceCustom(
                         options = KEYWORD_OPTIONS,
                         selected = state.keywords,
                         onToggle = state::toggleKeyword,
-                        customPlaceholder = "가고 싶은 곳을 입력하세요",
+                        customPlaceholder = tr("profile.placesPlaceholder"),
                     )
 
                     ProfileQuestion.Walking -> SingleChoice(
@@ -205,12 +207,12 @@ private fun QuestionNav(state: AppState) {
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             WebBackButton(
-                text = if (state.questionIndex == 0) "설정" else "이전",
+                text = if (state.questionIndex == 0) tr("profile.toSetup") else tr("common.back"),
                 onClick = { state.previousQuestion() },
             )
             // 모든 질문에 [다음] 버튼. 필수 질문은 선택 전엔 비활성.
             PrimaryCta(
-                text = if (last) "플랜 만들기" else "다음",
+                text = if (last) tr("profile.makePlan") else tr("common.next"),
                 enabled = !required || answered,
                 onClick = { state.nextQuestion() },
                 modifier = Modifier.weight(1f),
@@ -249,7 +251,7 @@ private fun QuestionPage(
             Spacer(Modifier.height(20.dp))
             // 웹 `.ask-question { 21px bold, line-height 1.45, tracking -0.02em }`
             Text(
-                question.title,
+                tr("profile.q.${question.name}.title"),
                 fontSize = 21.sp,
                 lineHeight = 30.sp,
                 fontWeight = FontWeight.Bold,
@@ -260,7 +262,7 @@ private fun QuestionPage(
             question.hint?.let {
                 Spacer(Modifier.height(10.dp))
                 // 웹 `.ask-hint { 13px, mono-500 }`
-                Text(it, fontSize = 13.sp, color = webTextFaint(), textAlign = TextAlign.Center)
+                Text(tr("profile.q.${question.name}.hint"), fontSize = 13.sp, color = webTextFaint(), textAlign = TextAlign.Center)
             }
             Spacer(Modifier.height(24.dp))
             options()
@@ -283,7 +285,7 @@ private fun SingleChoice(
             verticalArrangement = Arrangement.spacedBy(9.dp),
         ) {
             options.forEach { option ->
-                WebChip(option, selected == option, { onSelect(option) }, Modifier.fillMaxWidth())
+                WebChip(optLabel(option), selected == option, { onSelect(option) }, Modifier.fillMaxWidth())
             }
         }
     } else {
@@ -294,7 +296,7 @@ private fun SingleChoice(
             maxItemsInEachRow = 4,
         ) {
             options.forEach { option ->
-                WebChip(option, selected == option, { onSelect(option) })
+                WebChip(optLabel(option), selected == option, { onSelect(option) })
             }
         }
     }
@@ -314,7 +316,7 @@ private fun MultiChoice(
         maxItemsInEachRow = 4,
     ) {
         options.forEach { option ->
-            WebChip(option, option in selected, { onToggle(option) })
+            WebChip(optLabel(option), option in selected, { onToggle(option) })
         }
     }
 }
@@ -342,12 +344,12 @@ private fun SingleChoiceCustom(
             maxItemsInEachRow = 4,
         ) {
             options.forEach { option ->
-                WebChip(option, !customMode && selected == option, {
+                WebChip(optLabel(option), !customMode && selected == option, {
                     customMode = false
                     onSelectPreset(option)
                 })
             }
-            WebChip("기타", customMode, {
+            WebChip(optLabel("기타"), customMode, {
                 customMode = true
                 if (selected == null || selected in options) onCustomChange("")
             })
@@ -395,13 +397,13 @@ private fun MultiChoiceCustom(
             maxItemsInEachRow = 4,
         ) {
             options.forEach { option ->
-                WebChip(option, option in selected, { onToggle(option) })
+                WebChip(optLabel(option), option in selected, { onToggle(option) })
             }
             // 사용자가 직접 추가한 항목 (누르면 제거)
             customSelected.forEach { item ->
                 WebChip(item, true, { onToggle(item) })
             }
-            WebChip("기타", addMode, { addMode = !addMode })
+            WebChip(optLabel("기타"), addMode, { addMode = !addMode })
         }
         if (addMode) {
             Spacer(Modifier.height(12.dp))
@@ -413,7 +415,7 @@ private fun MultiChoiceCustom(
             )
             Spacer(Modifier.height(10.dp))
             PrimaryCta(
-                text = "추가",
+                text = tr("profile.add"),
                 enabled = draft.isNotBlank(),
                 onClick = addCustom,
                 modifier = Modifier.fillMaxWidth(),
@@ -500,7 +502,7 @@ private fun NoteField(state: AppState) {
     ) {
         if (state.preferenceNote.isEmpty()) {
             Text(
-                "예: 매운 음식 좋아요, 조용한 카페 위주로",
+                tr("profile.notePlaceholder"),
                 fontSize = 14.5.sp,
                 color = webTextDim(),
             )

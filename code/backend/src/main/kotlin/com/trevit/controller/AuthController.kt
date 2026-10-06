@@ -2,6 +2,9 @@ package com.trevit.controller
 
 import com.trevit.dto.AuthDtos.AuthConfigResponse
 import com.trevit.dto.AuthDtos.AuthResponse
+import com.trevit.dto.AuthDtos.ChangeNicknameRequest
+import com.trevit.dto.AuthDtos.ChangePasswordRequest
+import com.trevit.dto.AuthDtos.WithdrawRequest
 import com.trevit.dto.AuthDtos.GoogleLoginRequest
 import com.trevit.dto.AuthDtos.LoginRequest
 import com.trevit.dto.AuthDtos.SendCodeRequest
@@ -69,6 +72,33 @@ class AuthController(
     @PostMapping("/logout")
     fun logout(@RequestHeader(HttpHeaders.AUTHORIZATION, required = false) authorization: String?): Map<String, Boolean> {
         authService.logout(authorization)
+        return mapOf("ok" to true)
+    }
+
+    /** POST /api/auth/password — 비밀번호 변경 (현재 비밀번호 확인) */
+    @PostMapping("/password")
+    fun changePassword(
+        @RequestHeader(HttpHeaders.AUTHORIZATION, required = false) authorization: String?,
+        @RequestBody request: ChangePasswordRequest,
+    ): Map<String, Boolean> {
+        authService.changePassword(authorization, request)
+        return mapOf("ok" to true)
+    }
+
+    /** POST /api/auth/nickname — 닉네임 변경 → 바뀐 회원 정보 */
+    @PostMapping("/nickname")
+    fun changeNickname(
+        @RequestHeader(HttpHeaders.AUTHORIZATION, required = false) authorization: String?,
+        @RequestBody request: ChangeNicknameRequest,
+    ): UserResponse = authService.changeNickname(authorization, request)
+
+    /** POST /api/auth/withdraw — 회원 탈퇴 (계정·세션 삭제) */
+    @PostMapping("/withdraw")
+    fun withdraw(
+        @RequestHeader(HttpHeaders.AUTHORIZATION, required = false) authorization: String?,
+        @RequestBody request: WithdrawRequest,
+    ): Map<String, Boolean> {
+        authService.withdraw(authorization, request)
         return mapOf("ok" to true)
     }
 

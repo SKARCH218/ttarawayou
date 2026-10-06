@@ -63,6 +63,32 @@ class AuthRepository(
         }
     }
 
+    /** 비밀번호 변경 — 현재 비밀번호가 틀리면 서버가 거절한다 */
+    suspend fun changePassword(baseUrl: String, token: String, current: String, new: String) {
+        client.post(url(baseUrl, "/api/auth/password")) {
+            header(HttpHeaders.Authorization, "Bearer $token")
+            contentType(ContentType.Application.Json)
+            setBody(ChangePasswordRequest(current, new))
+        }.requireSuccess()
+    }
+
+    /** 닉네임 변경 → 바뀐 회원 정보 */
+    suspend fun changeNickname(baseUrl: String, token: String, nickname: String): UserDto =
+        client.post(url(baseUrl, "/api/auth/nickname")) {
+            header(HttpHeaders.Authorization, "Bearer $token")
+            contentType(ContentType.Application.Json)
+            setBody(ChangeNicknameRequest(nickname))
+        }.require()
+
+    /** 회원 탈퇴 — 계정과 로그인 세션이 모두 삭제된다 */
+    suspend fun deleteAccount(baseUrl: String, token: String, password: String?) {
+        client.post(url(baseUrl, "/api/auth/withdraw")) {
+            header(HttpHeaders.Authorization, "Bearer $token")
+            contentType(ContentType.Application.Json)
+            setBody(WithdrawRequest(password))
+        }.requireSuccess()
+    }
+
     private fun url(baseUrl: String, path: String) = baseUrl.trimEnd('/') + path
 
     private suspend inline fun <reified T> HttpResponse.require(): T {

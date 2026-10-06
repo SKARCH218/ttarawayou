@@ -14,13 +14,18 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import com.trevit.app.AppState
 import com.trevit.app.Screen
+import com.trevit.app.i18n.LocalLanguage
+import com.trevit.app.i18n.tr
 
 @Composable
 fun TrevitApp(state: AppState) {
-    TrevitTheme {
+    // 설정의 언어·테마를 앱 전체에 적용 (바꾸면 즉시 다시 그려진다)
+    CompositionLocalProvider(LocalLanguage provides state.language) {
+    TrevitTheme(state.themeMode) {
         Box(
             Modifier
                 .fillMaxSize()
@@ -43,25 +48,27 @@ fun TrevitApp(state: AppState) {
                     is Screen.Generating -> GeneratingScreen(state)
                     is Screen.Result -> ResultScreen(state)
                     is Screen.Journey -> JourneyScreen(state, screen.dayIndex)
+                    is Screen.Settings -> SettingsScreen(state)
                 }
             }
 
             state.errorMessage?.let { message ->
                 AlertDialog(
                     onDismissRequest = { state.errorMessage = null },
-                    title = { Text("플랜 생성 실패") },
+                    title = { Text(tr("app.planFailed")) },
                     text = { Text(message) },
                     confirmButton = {
                         TextButton(onClick = {
                             state.errorMessage = null
                             state.screen = Screen.Generating
-                        }) { Text("다시 시도") }
+                        }) { Text(tr("common.retry")) }
                     },
                     dismissButton = {
-                        TextButton(onClick = { state.loadDemoPlan() }) { Text("데모 플랜") }
+                        TextButton(onClick = { state.loadDemoPlan() }) { Text(tr("app.demoPlan")) }
                     },
                 )
             }
         }
+    }
     }
 }

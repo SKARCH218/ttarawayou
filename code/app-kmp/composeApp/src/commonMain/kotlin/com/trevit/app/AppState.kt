@@ -5,7 +5,10 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import com.trevit.app.i18n.AppLanguage
+import com.trevit.app.i18n.translate
 import com.trevit.app.map.getCurrentLocation
+import com.trevit.app.ui.ThemeMode
 import com.trevit.shared.PlanRepository
 import com.trevit.shared.PlanRequest
 import com.trevit.shared.PlanResponse
@@ -27,6 +30,7 @@ sealed interface Screen {
     data object Generating : Screen   // 생성 중
     data object Result : Screen       // 결과 플랜
     data class Journey(val dayIndex: Int) : Screen
+    data object Settings : Screen     // 설정 (계정·언어·테마·앱 정보·개발자 옵션)
 }
 
 /**
@@ -79,15 +83,43 @@ class AppState(
     private val onBaseUrlSaved: (String) -> Unit,
     initialAuthToken: String? = null,
     onAuthTokenSaved: (String?) -> Unit = {},
+    /** 언어·테마 등 설정 저장소 */
+    private val prefs: AppPrefs = AppPrefs.None,
+    /** 기기 언어 코드 ("ko", "en-US" …) — 저장된 언어가 없을 때 기본값으로 쓴다 */
+    systemLanguageCode: String? = null,
 ) {
     var baseUrl by mutableStateOf(initialBaseUrl)
         private set
+
+    // ---- 앱 설정 (설정 화면) ----
+
+    /** 화면 언어. 저장값 → 기기 언어 → 한국어 순 */
+    var language by mutableStateOf(AppLanguage.fromCode(prefs.get(PREF_LANGUAGE) ?: systemLanguageCode))
+        private set
+
+    /** 화면 테마 (시스템/라이트/다크) */
+    var themeMode by mutableStateOf(ThemeMode.fromCode(prefs.get(PREF_THEME)))
+        private set
+
+    fun changeLanguage(value: AppLanguage) {
+        language = value
+        prefs.put(PREF_LANGUAGE, value.code)
+    }
+
+    fun changeTheme(value: ThemeMode) {
+        themeMode = value
+        prefs.put(PREF_THEME, value.code)
+    }
+
+    /** 상태 클래스 안에서 쓰는 번역 (화면에서는 tr() 을 쓴다) */
+    fun t(key: String, vararg args: Any?): String = translate(language, key, *args)
 
     /** 로그인 상태 — 웹과 같은 `/api/auth` 엔드포인트를 쓴다 */
     val auth = AuthState(
         baseUrlProvider = { baseUrl },
         initialToken = initialAuthToken,
         onTokenSaved = onAuthTokenSaved,
+        languageProvider = { language },
     )
     var screen by mutableStateOf<Screen>(Screen.Intro)
     var plan by mutableStateOf<PlanResponse?>(null)
@@ -128,7 +160,7 @@ class AppState(
             throw e
         } catch (e: Exception) {
             walletBalance = 0
-            setupError = "서버에 연결할 수 없어요 — 잠시 후 다시 시도해 주세요."
+            setupError = t("state.walletLoadFailed")
         }
         budget = clampBudget(budget)
     }
@@ -160,7 +192,7 @@ class AppState(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            storeError = "상품을 불러오지 못했어요 — 서버 연결을 확인해 주세요."
+            storeError = t("state.storeLoadFailed")
         } finally {
             storeLoading = false
         }
@@ -178,7 +210,7 @@ class AppState(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            storeError = "구매에 실패했어요 — 서버 연결을 확인해 주세요."
+            storeError = t("state.purchaseFailed")
         } finally {
             storePendingId = null
         }
@@ -272,6 +304,8 @@ class AppState(
         // 현재 위치가 있으면 1일차를 현재 위치에서 출발시킨다 (없으면 백엔드가 숙소 출발로 폴백)
         startLatitude = startLat,
         startLongitude = startLng,
+        // AI가 플랜 설명을 사용자 화면 언어로 쓰게 한다
+        language = language.code,
     )
 
     /**
@@ -292,7 +326,7 @@ class AppState(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            errorMessage = e.message ?: "서버에 연결할 수 없습니다"
+            errorMessage = e.message ?: t("state.serverUnreachable")
             screen = Screen.Profile
         }
     }
@@ -318,6 +352,12 @@ class AppState(
 
     companion object {
         const val DEFAULT_BASE_URL = "http://10.0.2.2:8080"
+
+        /** 설정 화면 '앱 정보'에 표시 (composeApp versionName 과 맞춘다) */
+        const val APP_VERSION = "1.0"
+
+        private const val PREF_LANGUAGE = "language"
+        private const val PREF_THEME = "theme"
     }
 }
 
