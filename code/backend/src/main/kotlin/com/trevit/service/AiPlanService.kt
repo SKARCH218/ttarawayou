@@ -1,5 +1,6 @@
 package com.trevit.service
 
+import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.trevit.dto.PlanDtos
 import com.trevit.entity.Place
@@ -27,12 +28,19 @@ class AiPlanService(
     @Value("\${lmstudio.timeout-ms:20000}") private val timeoutMs: Int,
     @Value("\${lmstudio.api-key:}") private val apiKey: String,
     @Value("\${lmstudio.max-tokens:4000}") private val maxTokens: Int,
+    @Value("\${lmstudio.agent-enabled:true}") private val agentEnabled: Boolean = true,
+    @Value("\${lmstudio.max-tool-turns:6}") private val maxToolTurns: Int = 6,
 ) {
 
     private val log = LoggerFactory.getLogger(AiPlanService::class.java)
 
     /** AI가 고른 숙소와 일자별(방문 순서대로) 장소 목록 + 계획 이유(1~3문장) */
     data class AiSelection(val lodging: Place?, val days: List<List<Place>>, val reason: String? = null)
+
+    /** AI의 search_places 도구가 실제로 장소를 찾는 방법 (PlanService가 TMAP·후보 목록으로 구현) */
+    fun interface PlaceSearch {
+        fun search(query: String, type: PlaceType, lat: Double, lng: Double, radiusM: Double): List<Place>
+    }
 
     private val baseUrl: String = baseUrl.replace(Regex("/+$"), "")
     private val mapper = ObjectMapper()
@@ -47,16 +55,33 @@ class AiPlanService(
 
     /**
      * [zones] 장소 id → 권역 번호(=일차). 하루는 한 동네 안에서만 움직이도록 AI에게 알려준다.
+     * [search] 가 있으면 AI가 도구(장소 검색·주변 장소·거리)를 직접 호출하며 일정을 짠다.
+     * 도구로 찾은 장소도 최종 일정에 쓸 수 있다.
      */
     fun plan(
         budget: Long, days: Int, people: Int, nights: Int, places: List<Place>,
         profile: PlanDtos.TravelProfile = PlanDtos.TravelProfile(),
         zones: Map<Long, Int> = emptyMap(),
+        search: PlaceSearch? = null,
+        anchor: Pair<Double, Double>? = null,
     ): AiSelection? {
         if (!enabled) return null
         return try {
-            val content = chat(buildPrompt(budget, days, people, nights, places, profile, zones))
-            val sel = parse(content, days, places, nights > 0)
+            val prompt = buildPrompt(budget, days, people, nights, places, profile, zones)
+            val registry = LinkedHashMap<Long, Place>()
+            places.forEach { p -> p.id?.let { registry[it] = p } }
+            val content = if (agentEnabled && search != null) {
+                try {
+                    runAgent(prompt, registry, search, anchor)
+                } catch (e: Exception) {
+                    // 모델·서버가 도구 호출을 지원하지 않는 경우 등 — 도구 없이 한 번 더
+                    log.warn("AI 도구 호출 모드 실패({}) → 도구 없이 재시도", e.message)
+                    chat(prompt)
+                }
+            } else {
+                chat(prompt)
+            }
+            val sel = parse(content, days, registry.values.toList(), nights > 0)
             if (sel == null) {
                 log.warn("AI 응답 파싱/검증 실패 → 휴리스틱 폴백")
                 return null
@@ -104,11 +129,12 @@ class AiPlanService(
         }
         sb.append("- 식사는 아침 08시/점심 12시/저녁 17시 부근에 배치하라. ")
             .append("하루 시작이 늦으면 이미 지난 끼니는 생략하라 (3끼가 필수는 아니다)\n")
-            .append("- 매일 관광지 2~3곳 + 식당 최대 3곳. 입장료와 식비는 ")
+            .append("- 매일 관광지 ${profile.spotsPerDay}곳 + 식당 최대 3곳. 입장료와 식비는 ")
             .append(people).append("명 몫으로 계산된다\n")
             .append("- 같은 날의 장소들은 서로 가까운 곳으로 묶고, stopIds는 이동 동선이 자연스러운 방문 순서로 나열하라\n")
         if (zones.isNotEmpty()) {
-            sb.append("- 동선 규칙(필수): N일차 stopIds에는 권역이 N인 장소만 넣어라. 하루는 한 동네 안에서 걸어 다니며 먹고 노는 일정이다. ")
+            sb.append("- 동선 규칙(필수): N일차는 권역 N의 장소를 중심으로 짜라. 하루는 한 동네 안에서 걸어 다니며 먹고 노는 일정이다. ")
+                .append("도구로 찾은 장소를 넣을 때도 그날 권역 장소에서 2km 이내여야 한다. ")
                 .append("권역이 '-'인 숙소는 lodgingId로만 써라 (단, 꼭 가고 싶은 곳은 권역과 관계없이 넣는다)\n")
         }
         sb.append("- 식당과 관광지를 번갈아 배치하라 (아침식사로 시작하면 자연스럽다). ")
@@ -135,7 +161,7 @@ class AiPlanService(
                     PlaceType.RESTAURANT -> "식당"
                     PlaceType.ATTRACTION -> "관광지"
                 }).append('|')
-                .append(p.name).append('|')
+                .append(p.name).append(p.tags.firstOrNull()?.let { " [취향:$it]" } ?: "").append('|')
                 .append(p.price).append('|')
                 .append(p.rating).append('|')
                 .append(String.format(Locale.US, "%.4f", p.latitude)).append('|')
@@ -189,6 +215,23 @@ class AiPlanService(
             val f = foods.joinToString(", ")
             sb.append("- 음식 취향: ").append(f).append(" — 식당은 가능한 한 ").append(f).append(" 위주로 골라라\n")
         }
+        p.companion?.let {
+            sb.append("- 함께 가는 사람: ").append(it).append(" — ")
+            sb.append(when (it) {
+                "아이와 함께", "가족" -> "술집·주점은 절대 넣지 말고 체험·공원·박물관처럼 함께 즐길 곳 위주로"
+                "연인" -> "야경·카페·산책처럼 분위기 좋은 곳 위주로"
+                "친구" -> "시장·핫플·체험처럼 함께 놀기 좋은 곳 위주로"
+                else -> "혼자 여유롭게 둘러보기 좋은 곳 위주로"
+            }).append('\n')
+        }
+        if (p.moods.isNotEmpty()) {
+            sb.append("- 원하는 분위기: ").append(p.moods.joinToString(", ")).append(" — 이 분위기의 장소를 우선 선택하라\n")
+        }
+        if (p.activities.isNotEmpty()) {
+            sb.append("- 꼭 해보고 싶은 것: ").append(p.activities.joinToString(", "))
+                .append(" — 매일 일정에 이 활동을 할 수 있는 장소를 최소 1곳 넣어라\n")
+        }
+        sb.append("- 장소 이름 뒤에 [취향:…]이 붙은 곳은 여행자 취향에 맞춰 찾아온 장소이니 우선 선택하라\n")
         if (p.mustVisit.isNotEmpty()) {
             sb.append("- 꼭 가고 싶은 곳 (반드시 일정의 stopIds에 포함하라): ")
             sb.append(p.mustVisit.joinToString(", ") { "id ${it.id} '${it.name.replace('\'', ' ')}'" })
@@ -213,17 +256,135 @@ class AiPlanService(
     // ---------- LM Studio 호출 (OpenAI 호환 chat completions) ----------
 
     private fun chat(userPrompt: String): String {
-        val body = mapOf(
-            "model" to model,
-            "temperature" to 0.3,
-            // 실측 결과 이 추론 모델은 -1(무제한)로 두면 '생각'에만 13793/13796 토큰을 써서
-            // 5분을 줘도 응답을 못 끝냈다. 상한을 걸어 강제로 답을 내게 한다.
-            "max_tokens" to maxTokens,
-            "messages" to listOf(
-                mapOf("role" to "system", "content" to "너는 대한민국 여행 플래너다. 요청받은 JSON 형식으로만 답한다."),
-                mapOf("role" to "user", "content" to userPrompt),
-            ),
-        )
+        val messages = mapper.createArrayNode()
+        messages.addObject().put("role", "system").put("content", "너는 대한민국 여행 플래너다. 요청받은 JSON 형식으로만 답한다.")
+        messages.addObject().put("role", "user").put("content", userPrompt)
+        return completion(messages, tools = false).path("content").asText("")
+    }
+
+    // ---------- 도구 호출(에이전트) 모드 ----------
+
+    /**
+     * AI가 필요할 때 도구를 호출하며 일정을 짠다. 도구 결과를 대화에 붙여 다시 묻기를 반복하고,
+     * 마지막 차례에는 도구를 못 쓰게 해(tool_choice=none) 반드시 최종 JSON을 내게 한다.
+     */
+    private fun runAgent(
+        prompt: String, registry: MutableMap<Long, Place>, search: PlaceSearch, anchor: Pair<Double, Double>?,
+    ): String {
+        val messages = mapper.createArrayNode()
+        messages.addObject().put("role", "system").put("content", AGENT_SYSTEM)
+        messages.addObject().put("role", "user").put("content", prompt)
+        for (turn in 0 until maxOf(1, maxToolTurns)) {
+            val last = turn == maxToolTurns - 1
+            val msg = completion(messages, tools = true, forceAnswer = last)
+            val calls = msg.path("tool_calls")
+            if (last || !calls.isArray || calls.isEmpty) return msg.path("content").asText("")
+
+            // 어시스턴트의 도구 호출을 대화에 남기고, 각 호출 결과를 tool 메시지로 붙인다
+            val assistant = messages.addObject().put("role", "assistant")
+            assistant.put("content", msg.path("content").asText(""))
+            assistant.set<JsonNode>("tool_calls", calls)
+            for (call in calls) {
+                val name = call.path("function").path("name").asText()
+                val args = runCatching { mapper.readTree(call.path("function").path("arguments").asText("{}")) }
+                    .getOrElse { mapper.createObjectNode() }
+                val result = runCatching { runTool(name, args, registry, search, anchor) }
+                    .getOrElse { mapper.createObjectNode().put("error", it.message ?: "도구 실행 실패").toString() }
+                log.info("AI 도구 호출 [{}] {} → {}자", turn + 1, name, result.length)
+                messages.addObject().put("role", "tool")
+                    .put("tool_call_id", call.path("id").asText())
+                    .put("content", result)
+            }
+        }
+        return ""
+    }
+
+    private fun runTool(
+        name: String, args: JsonNode, registry: MutableMap<Long, Place>,
+        search: PlaceSearch, anchor: Pair<Double, Double>?,
+    ): String {
+        fun kindOf(node: JsonNode) = when (node.asText("attraction")) {
+            "restaurant" -> PlaceType.RESTAURANT
+            "lodging" -> PlaceType.LODGING
+            else -> PlaceType.ATTRACTION
+        }
+        fun near(idNode: JsonNode): Pair<Double, Double>? =
+            registry[idNode.asLong(-1)]?.let { it.latitude to it.longitude }
+        val out = mapper.createObjectNode()
+        when (name) {
+            "search_places" -> {
+                val query = args.path("query").asText("").trim()
+                require(query.isNotEmpty()) { "query 가 비어 있습니다" }
+                val center = near(args.path("near_place_id")) ?: anchor
+                    ?: registry.values.firstOrNull()?.let { it.latitude to it.longitude }
+                    ?: error("검색 기준 위치가 없습니다")
+                val radiusM = (args.path("radius_km").asDouble(3.0).coerceIn(0.3, 15.0)) * 1000
+                val found = search.search(query, kindOf(args.path("kind")), center.first, center.second, radiusM)
+                    .take(TOOL_RESULT_LIMIT)
+                found.forEach { p -> p.id?.let { registry[it] = p } }
+                out.set<JsonNode>("places", placesJson(found, center))
+            }
+            "places_near" -> {
+                val center = near(args.path("place_id")) ?: error("place_id 에 해당하는 장소가 없습니다")
+                val radiusM = args.path("radius_m").asDouble(800.0).coerceIn(100.0, 3000.0)
+                val type = kindOf(args.path("kind"))
+                val found = registry.values
+                    .filter { it.type == type && GeoUtil.distanceMeters(center.first, center.second, it.latitude, it.longitude) <= radiusM }
+                    .sortedBy { GeoUtil.distanceMeters(center.first, center.second, it.latitude, it.longitude) }
+                    .take(TOOL_RESULT_LIMIT)
+                out.set<JsonNode>("places", placesJson(found, center))
+            }
+            "distance" -> {
+                val a = registry[args.path("from_id").asLong(-1)] ?: error("from_id 에 해당하는 장소가 없습니다")
+                val b = registry[args.path("to_id").asLong(-1)] ?: error("to_id 에 해당하는 장소가 없습니다")
+                val m = GeoUtil.distanceMeters(a.latitude, a.longitude, b.latitude, b.longitude)
+                out.put("meters", m.toInt()).put("walk_minutes", (m / 67).toInt())
+            }
+            else -> error("알 수 없는 도구: $name")
+        }
+        return out.toString()
+    }
+
+    private fun placesJson(places: List<Place>, from: Pair<Double, Double>): JsonNode {
+        val arr = mapper.createArrayNode()
+        for (p in places) {
+            arr.addObject()
+                .put("id", p.id ?: continue)
+                .put("name", p.name)
+                .put("kind", when (p.type) {
+                    PlaceType.LODGING -> "lodging"
+                    PlaceType.RESTAURANT -> "restaurant"
+                    PlaceType.ATTRACTION -> "attraction"
+                })
+                .put("price", p.price)
+                .put("rating", p.rating)
+                .put("address", p.address)
+                .put("meters_away", GeoUtil.distanceMeters(from.first, from.second, p.latitude, p.longitude).toInt())
+        }
+        return arr
+    }
+
+    /** OpenAI 형식 도구 정의 — 게이트웨이·LM Studio 모두 같은 형식을 쓴다 */
+    private val toolSchemas: JsonNode by lazy { mapper.readTree(TOOLS_JSON) }
+
+    /** chat/completions 한 번 호출 → 응답 message 노드 */
+    private fun completion(messages: JsonNode, tools: Boolean, forceAnswer: Boolean = false): JsonNode {
+        val body = mapper.createObjectNode()
+        body.put("model", model)
+        body.put("temperature", 0.3)
+        // 실측 결과 이 추론 모델은 -1(무제한)로 두면 '생각'에만 13793/13796 토큰을 써서
+        // 5분을 줘도 응답을 못 끝냈다. 상한을 걸어 강제로 답을 내게 한다.
+        body.put("max_tokens", maxTokens)
+        body.set<JsonNode>("messages", messages)
+        if (tools) {
+            body.set<JsonNode>("tools", toolSchemas)
+            body.put("tool_choice", if (forceAnswer) "none" else "auto")
+        }
+        val res = post(mapper.writeValueAsString(body))
+        return mapper.readTree(res).path("choices").path(0).path("message")
+    }
+
+    private fun post(json: String): String {
         // 응답을 바이트로 받아 직접 문자열로 바꾼다.
         // LM Studio 는 버전·설정에 따라 Content-Type 을 application/octet-stream 으로 주기도 하는데,
         // String 으로 바로 받으면 컨버터를 못 찾아 "Error while extracting response" 로 실패한다.
@@ -238,13 +399,12 @@ class AiPlanService(
                 // LM Studio 서버의 "Require API key"가 켜져 있으면 토큰 없이는 401이 난다.
                 if (apiKey.isNotBlank()) header("Authorization", "Bearer $apiKey")
             }
-            .body(mapper.writeValueAsString(body))
+            .body(json)
             .retrieve()
             .body(ByteArray::class.java)
             ?.toString(Charsets.UTF_8)
-            ?: return ""
-        val root = mapper.readTree(res)
-        return root.path("choices").path(0).path("message").path("content").asText("")
+            ?: return "{}"
+        return res
     }
 
     // ---------- 응답 파싱 · 검증 ----------
@@ -289,5 +449,48 @@ class AiPlanService(
             for (p in day) total += p.price.toLong() * people
         }
         return total
+    }
+
+    companion object {
+        private const val TOOL_RESULT_LIMIT = 8
+
+        private const val AGENT_SYSTEM =
+            "너는 대한민국 여행 플래너다. 아래 장소 목록으로 일정을 짜되, 여행자 취향에 더 맞는 곳이 필요하면 " +
+                "도구로 직접 찾아라. search_places 로 찾은 장소의 id도 stopIds에 쓸 수 있다. " +
+                "같은 날 장소들은 서로 걸어 다닐 만한 거리(대략 2km 이내)로 묶고, 필요하면 distance 로 확인하라. " +
+                "검색은 그날 동네 장소 근처(near_place_id)에서 하라. 도구는 꼭 필요할 때만 몇 번 쓰고, " +
+                "마지막에는 요청받은 JSON 형식으로만 답한다."
+
+        private const val TOOLS_JSON = """
+[
+  {"type": "function", "function": {
+    "name": "search_places",
+    "description": "키워드로 실제 장소를 검색한다 (예: '루프탑 카페', '야경 전망대', '해물칼국수'). 결과의 id는 일정에 그대로 쓸 수 있다.",
+    "parameters": {"type": "object", "properties": {
+      "query": {"type": "string", "description": "검색어"},
+      "kind": {"type": "string", "enum": ["attraction", "restaurant", "lodging"], "description": "장소 종류"},
+      "near_place_id": {"type": "integer", "description": "이 장소 근처에서 찾는다 (없으면 여행 기준점 근처)"},
+      "radius_km": {"type": "number", "description": "검색 반경 km (기본 3)"}
+    }, "required": ["query", "kind"]}
+  }},
+  {"type": "function", "function": {
+    "name": "places_near",
+    "description": "지금까지 알려진 장소 중 특정 장소 주변의 장소를 가까운 순으로 돌려준다.",
+    "parameters": {"type": "object", "properties": {
+      "place_id": {"type": "integer"},
+      "kind": {"type": "string", "enum": ["attraction", "restaurant", "lodging"]},
+      "radius_m": {"type": "integer", "description": "반경 m (기본 800)"}
+    }, "required": ["place_id", "kind"]}
+  }},
+  {"type": "function", "function": {
+    "name": "distance",
+    "description": "두 장소 사이 직선거리(m)와 도보 예상 시간(분)",
+    "parameters": {"type": "object", "properties": {
+      "from_id": {"type": "integer"},
+      "to_id": {"type": "integer"}
+    }, "required": ["from_id", "to_id"]}
+  }}
+]
+"""
     }
 }

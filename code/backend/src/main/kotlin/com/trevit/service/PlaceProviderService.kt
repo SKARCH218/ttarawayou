@@ -33,6 +33,7 @@ class PlaceProviderService(
     }
 
     private val cache = ConcurrentHashMap<String, Pool>()
+    private val prefCache = ConcurrentHashMap<String, List<TmapService.Poi>>()
     private val idSeq = AtomicLong(1_000_000)
 
     fun places(lat: Double, lng: Double): Pool {
@@ -91,10 +92,42 @@ class PlaceProviderService(
 
     private fun fetchFromSeed(lat: Double, lng: Double): Pool {
         val seed = seedPlaceService.poolNear(lat, lng)
+        // 시드는 수도권 몇 곳뿐이다. 멀리 떨어진 지역(예: 부산)을 서울 시드로 짜면 엉뚱한 일정이 되므로 거절한다.
+        val spots = seed.attractions + seed.restaurants
+        if (spots.isNotEmpty()) {
+            val cLat = spots.map { it.latitude }.average()
+            val cLng = spots.map { it.longitude }.average()
+            require(GeoUtil.distanceMeters(lat, lng, cLat, cLng) <= SEED_MAX_DISTANCE_M) {
+                "이 지역은 실시간 장소 검색이 켜져 있어야 플랜을 만들 수 있어요. 잠시 후 다시 시도해 주세요."
+            }
+        }
         return Pool(seed.lodgings, seed.restaurants, seed.attractions, "SEED:${seed.region}")
     }
 
-    private fun toPlaces(pois: List<TmapService.Poi>, type: PlaceType): List<Place> {
+    /** 키워드 하나로 장소 검색 (AI 도구 search_places 용). 찾은 장소에는 검색어를 태그로 붙인다 */
+    fun searchKeyword(query: String, type: PlaceType, lat: Double, lng: Double, radiusM: Double): List<Place> =
+        preferencePlaces(lat, lng, listOf(Triple(query, type, query)), radiusM)
+
+    /**
+     * 취향에 맞는 장소를 따로 찾아온다 (검색어마다 기준점에서 가까운 순, [radiusM] 이내).
+     * 찾은 장소에는 취향 라벨을 태그로 붙여 점수 계산에서 알아볼 수 있게 한다.
+     */
+    fun preferencePlaces(
+        lat: Double, lng: Double, searches: List<Triple<String, PlaceType, String>>, radiusM: Double,
+    ): List<Place> {
+        if (!tmapService.usable()) return emptyList()
+        return searches.flatMap { (keyword, type, label) ->
+            val key = String.format(Locale.US, "%.2f,%.2f,%s", lat, lng, keyword)
+            val pois = prefCache.getOrPut(key) { tmapService.searchPois(keyword, lat, lng, PREF_FETCH_COUNT) }
+            toPlaces(pois.filter { GeoUtil.distanceMeters(lat, lng, it.lat, it.lng) <= radiusM }, type,
+                "취향 검색: $label").onEach { it.tags = setOf(label) }
+        }
+    }
+
+    private fun toPlaces(
+        pois: List<TmapService.Poi>, type: PlaceType,
+        description: String = "TMAP 검색 결과 (가격은 추정)",
+    ): List<Place> {
         val out = ArrayList<Place>()
         for (poi in pois) {
             if (poi.name.isBlank()) continue
@@ -110,7 +143,7 @@ class PlaceProviderService(
             val rating = Math.round((3.8 + (h % 12) * 0.1) * 10) / 10.0  // 3.8~4.9
             val p = Place(
                 n, type, poi.address.ifBlank { "주소 정보 없음" },
-                poi.lat, poi.lng, price, rating, "TMAP 검색 결과 (가격은 추정)",
+                poi.lat, poi.lng, price, rating, description,
             )
             p.id = idSeq.incrementAndGet()
             out.add(p)
@@ -122,5 +155,7 @@ class PlaceProviderService(
         private const val FETCH_COUNT = 60 // 카테고리당 후보 수
         private const val MIN_USABLE = 6   // 이보다 적으면 시드 폴백
         private const val MUST_VISIT_RADIUS_M = 50_000.0 // 이보다 먼 동명 장소는 다른 지역으로 보고 제외
+        private const val SEED_MAX_DISTANCE_M = 60_000.0 // 시드 장소가 이보다 멀면 그 지역 시드가 없는 것
+        private const val PREF_FETCH_COUNT = 10          // 취향 검색어당 가져올 장소 수
     }
 }

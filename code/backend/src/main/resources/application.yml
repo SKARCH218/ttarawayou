@@ -78,6 +78,11 @@ lmstudio:
   # LM Studio 서버의 "Require API key" 설정을 켰다면 여기에 그 토큰을 넣는다.
   # 비어 있으면 Authorization 헤더를 아예 보내지 않는다 (기존과 동일하게 동작).
   api-key: ${LMSTUDIO_API_KEY:}
+  # AI가 도구(장소 검색·주변 장소·거리)를 직접 호출하며 일정을 짜는 모드.
+  # 모델이 도구 호출을 지원하지 않으면 자동으로 도구 없이 한 번 더 시도한다.
+  agent-enabled: ${LMSTUDIO_AGENT_ENABLED:true}
+  # 도구 호출 왕복 최대 횟수 (마지막 차례에는 도구 없이 답을 내게 한다)
+  max-tool-turns: ${LMSTUDIO_MAX_TOOL_TURNS:6}
   # 추론(reasoning) 모델이 생각에만 토큰을 다 써버려 응답을 못 끝내는 걸 방지하는 상한선.
   # 실측: reasoning_tokens가 13793/13796으로 거의 전부를 차지해 5분을 줘도 응답이 안 끝났다.
   max-tokens: ${LMSTUDIO_MAX_TOKENS:4000}

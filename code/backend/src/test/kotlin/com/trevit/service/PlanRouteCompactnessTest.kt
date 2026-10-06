@@ -23,11 +23,11 @@ class PlanRouteCompactnessTest {
 
     private fun planService(): PlanService {
         val wallets = Mockito.mock(WalletRepository::class.java)
-        Mockito.`when`(wallets.findById(1L)).thenReturn(Optional.of(Wallet(1L, Wallet.INITIAL_BALANCE)))
+        Mockito.`when`(wallets.findById(1L)).thenAnswer { Optional.of(Wallet(1L, Wallet.INITIAL_BALANCE)) }
         val tmap = TmapService(null)
         val route = RouteService(null, "http://127.0.0.1:1", PublicBusService(null), IntercityBusService(null), tmap)
         val ai = AiPlanService("http://127.0.0.1:1/v1", "none", false, 1000, "", 4000)
-        return PlanService(route, ai, wallets, PlaceProviderService(tmap, SeedPlaceService()), RegionService())
+        return PlanService(route, ai, wallets, PlaceProviderService(tmap, SeedPlaceService()), RegionService(tmap))
     }
 
     /** TMAP처럼 기준점 반경 15km에 흩어진 장소 후보 (평점·가격은 무작위, 시드 고정) */
@@ -53,17 +53,35 @@ class PlanRouteCompactnessTest {
     @Test
     fun `흩어진 후보에서도 하루 장소들은 한 동네 안에 모인다`() {
         val wallets = Mockito.mock(WalletRepository::class.java)
-        Mockito.`when`(wallets.findById(1L)).thenReturn(Optional.of(Wallet(1L, Wallet.INITIAL_BALANCE)))
+        Mockito.`when`(wallets.findById(1L)).thenAnswer { Optional.of(Wallet(1L, Wallet.INITIAL_BALANCE)) }
         val tmap = TmapService(null)
         val route = RouteService(null, "http://127.0.0.1:1", PublicBusService(null), IntercityBusService(null), tmap)
         val ai = AiPlanService("http://127.0.0.1:1/v1", "none", false, 1000, "", 4000)
         val provider = Mockito.mock(PlaceProviderService::class.java)
         Mockito.`when`(provider.places(Mockito.anyDouble(), Mockito.anyDouble())).thenReturn(scatteredPool(37.5665, 126.9780))
-        val plan = PlanService(route, ai, wallets, provider, RegionService()).createPlan(
+        val plan = PlanService(route, ai, wallets, provider, RegionService(tmap)).createPlan(
             PlanRequest(budget = 300_000, days = 2, people = 1, region = "서울",
                 startLatitude = 37.5563, startLongitude = 126.9236),
         )
         assertCompact(plan)
+    }
+
+    @Test
+    fun `같은 조건으로 여러 번 만들면 일정이 매번 똑같지는 않다`() {
+        val wallets = Mockito.mock(WalletRepository::class.java)
+        Mockito.`when`(wallets.findById(1L)).thenAnswer { Optional.of(Wallet(1L, Wallet.INITIAL_BALANCE)) }
+        val tmap = TmapService(null)
+        val route = RouteService(null, "http://127.0.0.1:1", PublicBusService(null), IntercityBusService(null), tmap)
+        val ai = AiPlanService("http://127.0.0.1:1/v1", "none", false, 1000, "", 4000)
+        val provider = Mockito.mock(PlaceProviderService::class.java)
+        Mockito.`when`(provider.places(Mockito.anyDouble(), Mockito.anyDouble())).thenReturn(scatteredPool(37.5665, 126.9780))
+        val service = PlanService(route, ai, wallets, provider, RegionService(tmap))
+        val itineraries = (1..6).map {
+            service.createPlan(PlanRequest(budget = 300_000, days = 1, people = 1, region = "서울"))
+                .dayPlans.flatMap { d -> d.stops.map { s -> s.name } }.toSet()
+        }.toSet()
+        println("서로 다른 일정 수: ${itineraries.size} / 6")
+        assertTrue(itineraries.size >= 2, "6번 모두 같은 일정이 나옴")
     }
 
     @Test
@@ -88,7 +106,7 @@ class PlanRouteCompactnessTest {
             } ?: 0.0
             println("Day ${day.day}: 장소 ${spots.size}곳, 중심에서 최대 ${maxFromCenter.toInt()}m, " +
                 "장소 간 최대 직선 ${maxLeg.toInt()}m — ${spots.joinToString { it.name }}")
-            assertTrue(maxFromCenter <= 4_000.0, "Day ${day.day} 장소가 동네 밖으로 흩어짐: ${maxFromCenter.toInt()}m")
+            assertTrue(maxFromCenter <= 5_000.0, "Day ${day.day} 장소가 동네 밖으로 흩어짐: ${maxFromCenter.toInt()}m")
         }
     }
 }

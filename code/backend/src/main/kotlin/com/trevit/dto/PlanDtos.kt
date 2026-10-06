@@ -20,6 +20,10 @@ object PlanDtos {
         val keywords: List<String>? = null,   // 선호 키워드: 산 | 바다 | 공원 | 강
         val preferenceNote: String? = null,   // 자유 서술 취향 ("매운 음식 좋아요, 조용한 카페 위주로")
         val mustVisit: List<String>? = null,  // 꼭 가고 싶은 장소 이름 (예: ["경복궁","광장시장"])
+        val companion: String? = null,        // 혼자 | 연인 | 친구 | 가족 | 아이와 함께
+        val moods: List<String>? = null,      // 분위기: 힙한 핫플 | 조용한 힐링 | 로컬 감성 | 전통·역사 | 자연
+        val activities: List<String>? = null, // 하고 싶은 것: 카페 투어 | 야경 | 시장 구경 | 전시·박물관 | 산책 | 사진 명소 | 체험
+        val pace: String? = null,             // 여유롭게 | 적당히 | 꽉 채워서 → 하루 관광지 2 / 3 / 4곳
         val language: String? = null,         // 앱 화면 언어 ko | en | ja | zh — AI·설명 문구 언어
     )
 
@@ -35,18 +39,30 @@ object PlanDtos {
         val keywords: List<String> = emptyList(),
         val preferenceNote: String? = null,
         val mustVisit: List<com.trevit.entity.Place> = emptyList(),
+        val companion: String? = null,
+        val moods: List<String> = emptyList(),
+        val activities: List<String> = emptyList(),
+        val spotsPerDay: Int = 3,
         /** AI가 reason 을 쓸 언어 (ko | en | ja | zh) */
         val language: String = "ko",
     ) {
         fun isEmpty(): Boolean =
             gender == null && ageGroup == null && mbti == null && purpose == null &&
                 foodPreference == null && !avoidWalking && keywords.isEmpty() &&
-                preferenceNote.isNullOrBlank() && mustVisit.isEmpty()
+                preferenceNote.isNullOrBlank() && mustVisit.isEmpty() && companion == null &&
+                moods.isEmpty() && activities.isEmpty()
     }
 
     /** "휴양, 미식" 처럼 ", "로 이어 보낸 다중 선택 값을 나눈다 */
     fun splitChoices(value: String?): List<String> =
         value?.split(",")?.map { it.trim() }?.filter { it.isNotEmpty() }.orEmpty()
+
+    /** 여행 페이스 → 하루 관광지 수 */
+    fun spotsPerDay(pace: String?): Int = when (pace) {
+        "여유롭게" -> 2
+        "꽉 채워서" -> 4
+        else -> 3
+    }
 
     /** 예산 배분 내역 */
     data class BudgetBreakdown(
