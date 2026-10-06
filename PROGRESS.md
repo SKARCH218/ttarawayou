@@ -71,3 +71,21 @@ node2(`playlabs@10.8.2.5`, 서비스명 `trevit`, user-level systemd)의
 - **참고**: 8/22에 이 계정에서 `807308082@qq.com`으로 보낸 메일이 스팸으로 차단된 기록 발견 — 원인은 불명확하나(피싱 메일 수신 후 자동 반응 추정) 위 보안 점검에서 지속적 침해 흔적은 못 찾음
 - **다음 결정 필요**: Gmail을 몇 시간~하루 더 기다렸다가 재시도할지, 아니면 지금 SendGrid 등 트랜잭션 메일 서비스로 교체할지 — 팀 논의 후 결정 예정
 
+
+## 2026-09-29 ~ 10-06 — Gmail 복구, 스팸함 문제, 메일 서비스 교체 검토
+
+- **9/29**: 하루 기다린 뒤 Gmail SMTP 인증이 다시 성공 (복원 직후 구글 제한이었던 것으로 확인). 다만 인증메일이 **수신자 스팸함**으로 감 — 정지 이력으로 발신 평판이 낮고, "자동 인증코드 발송" 패턴 자체가 스팸/봇 탐지에 걸리기 쉬움
+- 팀 결정: Gmail에서 트랜잭션 메일 서비스로 교체. SendGrid는 2025년 영구 무료 플랜이 없어져 제외, Resend(월 3,000통 무료, SMTP 지원)로 진행 시도
+- Resend 설정: SMTP는 `smtp.resend.com` / 587 / 사용자명 `resend` / 비밀번호 = API 키라서 **코드 수정 없이 env 값만 교체**하면 됨. `travit.p-e.kr`용 DNS 레코드 4개(DKIM TXT, CNAME 2개, DMARC TXT)를 p-e.kr 패널에 등록했고 전파까지 확인
+- **10/6 막힘**: Resend가 `travit.p-e.kr`을 **"We don't allow free public domains"** 로 거부 → p-e.kr 같은 무료 공용 도메인은 Resend에서 사용 불가. 위에서 등록한 DNS 레코드는 Resend 용도로는 쓸모없음 (남겨둬도 무해)
+- 팀에서 임시 우회책 추가 (`7a96b68`): 서버 `INVITE_CODE` 환경변수와 같은 초대코드를 가입 시 입력하면 메일 인증을 건너뜀. 메일 인증이 막혀 9/7부터 신규 가입자가 0명이었던 상황 대응 (코드 값은 저장소에 없음)
+
+### 남은 선택지 (팀 결정 필요)
+- **A. Brevo** (하루 300통 무료, SMTP 지원): gmail·yahoo 같은 메일 서비스 도메인만 막는 것으로 알려져 `travit.p-e.kr` 인증이 통과할 가능성 있음(미확인). 거부되면 발신 주소가 `@brevosend.com`으로 바뀌어 스팸함 위험
+- **B. 본인 소유 도메인 구입 + Resend**: 도메인 연 수천 원~2만 원대, 가장 확실. 서비스 주소도 이 도메인으로 옮길 수 있음
+- **C. 현 상태 유지** (Gmail + 초대코드 우회): 무료지만 스팸함행 지속, 계정 재정지 위험
+
+### 다음에 할 일
+- [ ] 위 A/B/C 중 결정
+- [ ] 결정에 따라 `~/trevit/trevit.env`의 `MAIL_HOST`/`MAIL_PORT`/`MAIL_USERNAME`/`MAIL_PASSWORD`/`MAIL_FROM` 갱신 후 `systemctl --user restart trevit`, `deploy/.env.production.example`에도 반영
+- [ ] 메일 인증이 정상화되면 `INVITE_CODE` 우회 유지 여부 결정
