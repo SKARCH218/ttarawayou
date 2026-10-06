@@ -23,6 +23,10 @@ data class PlanRequest(
     val keywords: List<String>? = null,  // 예: ["바다","공원"]
     val preferenceNote: String? = null,  // 자유 서술 취향 메모
     val mustVisit: List<String>? = null, // 꼭 가고 싶은 장소 이름
+    val companion: String? = null,       // 혼자 | 연인 | 친구 | 가족 | 아이와 함께
+    val moods: List<String>? = null,     // 분위기 (여러 개)
+    val activities: List<String>? = null, // 꼭 해보고 싶은 것 (여러 개)
+    val pace: String? = null,            // 여유롭게 | 적당히 | 꽉 채워서
     val startLatitude: Double? = null,
     val startLongitude: Double? = null,
     /** 화면 언어 (ko | en | ja | zh) — AI 설명·플랜 설명 문구를 이 언어로 쓴다 */

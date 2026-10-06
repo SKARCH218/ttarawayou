@@ -44,33 +44,73 @@ internal val commonStrings: Map<String, List<String>> = mapOf(
     "opt.화성" to listOf("화성", "Hwaseong", "華城", "华城"),
     "opt.시흥" to listOf("시흥", "Siheung", "始興", "始兴"),
     "opt.과천" to listOf("과천", "Gwacheon", "果川", "果川"),
-    "opt.광주" to listOf("광주", "Gwangju", "広州", "广州"),
+    "opt.광주" to listOf("광주", "Gwangju", "光州", "光州"),
     "opt.김포" to listOf("김포", "Gimpo", "金浦", "金浦"),
     "opt.안산" to listOf("안산", "Ansan", "安山", "安山"),
+    "opt.경기광주" to listOf("경기광주", "Gwangju (Gyeonggi)", "京畿広州", "京畿广州"),
+    "opt.부산" to listOf("부산", "Busan", "釜山", "釜山"),
+    "opt.대구" to listOf("대구", "Daegu", "大邱", "大邱"),
+    "opt.대전" to listOf("대전", "Daejeon", "大田", "大田"),
+    "opt.울산" to listOf("울산", "Ulsan", "蔚山", "蔚山"),
+    "opt.세종" to listOf("세종", "Sejong", "世宗", "世宗"),
+    "opt.경주" to listOf("경주", "Gyeongju", "慶州", "庆州"),
+    "opt.전주" to listOf("전주", "Jeonju", "全州", "全州"),
+    "opt.강릉" to listOf("강릉", "Gangneung", "江陵", "江陵"),
+    "opt.속초" to listOf("속초", "Sokcho", "束草", "束草"),
+    "opt.춘천" to listOf("춘천", "Chuncheon", "春川", "春川"),
+    "opt.여수" to listOf("여수", "Yeosu", "麗水", "丽水"),
+    "opt.순천" to listOf("순천", "Suncheon", "順天", "顺天"),
+    "opt.통영" to listOf("통영", "Tongyeong", "統営", "统营"),
+    "opt.거제" to listOf("거제", "Geoje", "巨済", "巨济"),
+    "opt.안동" to listOf("안동", "Andong", "安東", "安东"),
+    "opt.포항" to listOf("포항", "Pohang", "浦項", "浦项"),
+    "opt.제주" to listOf("제주", "Jeju", "済州", "济州"),
+    "opt.서귀포" to listOf("서귀포", "Seogwipo", "西帰浦", "西归浦"),
 
     // ---- 여행 유형 ----
     "opt.휴양" to listOf("휴양", "Relaxation", "リラックス", "休闲"),
     "opt.관광" to listOf("관광", "Sightseeing", "観光", "观光"),
     "opt.미식" to listOf("미식", "Food tour", "グルメ", "美食"),
     "opt.액티비티" to listOf("액티비티", "Activities", "アクティビティ", "户外活动"),
+    "opt.쇼핑" to listOf("쇼핑", "Shopping", "ショッピング", "购物"),
+    "opt.문화·예술" to listOf("문화·예술", "Culture & arts", "文化・芸術", "文化艺术"),
 
-    // ---- 성별 ----
-    "opt.남" to listOf("남", "Male", "男性", "男"),
-    "opt.여" to listOf("여", "Female", "女性", "女"),
-    "opt.선택 안 함" to listOf("선택 안 함", "Prefer not to say", "回答しない", "不透露"),
+    // ---- 누구와 ----
+    "opt.혼자" to listOf("혼자", "Solo", "ひとり", "独自"),
+    "opt.연인" to listOf("연인", "Partner", "恋人", "恋人"),
+    "opt.친구" to listOf("친구", "Friends", "友達", "朋友"),
+    "opt.가족" to listOf("가족", "Family", "家族", "家人"),
+    "opt.아이와 함께" to listOf("아이와 함께", "With kids", "子ども連れ", "带孩子"),
 
-    // ---- 연령대 ----
-    "opt.10대" to listOf("10대", "Teens", "10代", "10多岁"),
-    "opt.20대" to listOf("20대", "20s", "20代", "20多岁"),
-    "opt.30대" to listOf("30대", "30s", "30代", "30多岁"),
-    "opt.40대" to listOf("40대", "40s", "40代", "40多岁"),
-    "opt.50대+" to listOf("50대+", "50s+", "50代以上", "50岁以上"),
+    // ---- 분위기 ----
+    "opt.힙한 핫플" to listOf("힙한 핫플", "Trendy hotspots", "話題のスポット", "网红热门地"),
+    "opt.조용한 힐링" to listOf("조용한 힐링", "Quiet & relaxing", "静かな癒やし", "安静疗愈"),
+    "opt.로컬 감성" to listOf("로컬 감성", "Local feel", "ローカル感", "本地风情"),
+    "opt.전통·역사" to listOf("전통·역사", "Tradition & history", "伝統・歴史", "传统历史"),
+    "opt.자연" to listOf("자연", "Nature", "自然", "自然"),
+
+    // ---- 꼭 해보고 싶은 것 ----
+    "opt.카페 투어" to listOf("카페 투어", "Café hopping", "カフェ巡り", "咖啡馆探店"),
+    "opt.야경" to listOf("야경", "Night views", "夜景", "夜景"),
+    "opt.시장 구경" to listOf("시장 구경", "Markets", "市場めぐり", "逛市场"),
+    "opt.전시·박물관" to listOf("전시·박물관", "Museums & exhibits", "展示・博物館", "展览博物馆"),
+    "opt.산책" to listOf("산책", "Strolls", "散歩", "散步"),
+    "opt.사진 명소" to listOf("사진 명소", "Photo spots", "写真スポット", "拍照胜地"),
+    "opt.체험" to listOf("체험", "Hands-on activities", "体験", "体验活动"),
+
+    // ---- 여행 페이스 ----
+    "opt.여유롭게" to listOf("여유롭게 (하루 2곳)", "Relaxed (2 spots/day)", "ゆったり（1日2か所）", "悠闲（每天 2 处）"),
+    "opt.적당히" to listOf("적당히 (하루 3곳)", "Balanced (3 spots/day)", "ほどほど（1日3か所）", "适中（每天 3 处）"),
+    "opt.꽉 채워서" to listOf("꽉 채워서 (하루 4곳)", "Packed (4 spots/day)", "ぎっしり（1日4か所）", "紧凑（每天 4 处）"),
 
     // ---- 음식 ----
     "opt.한식" to listOf("한식", "Korean", "韓国料理", "韩餐"),
     "opt.양식" to listOf("양식", "Western", "洋食", "西餐"),
     "opt.일식" to listOf("일식", "Japanese", "和食", "日料"),
     "opt.중식" to listOf("중식", "Chinese", "中華料理", "中餐"),
+    "opt.해산물" to listOf("해산물", "Seafood", "海鮮", "海鲜"),
+    "opt.디저트" to listOf("디저트", "Desserts", "デザート", "甜点"),
+    "opt.길거리 음식" to listOf("길거리 음식", "Street food", "屋台グルメ", "街头小吃"),
     "opt.상관없음" to listOf("상관없음", "Anything", "こだわらない", "都可以"),
 
     // ---- 가고 싶은 곳 ----
@@ -78,6 +118,8 @@ internal val commonStrings: Map<String, List<String>> = mapOf(
     "opt.바다" to listOf("바다", "Sea", "海", "海"),
     "opt.공원" to listOf("공원", "Parks", "公園", "公园"),
     "opt.강" to listOf("강", "Rivers", "川", "江河"),
+    "opt.호수" to listOf("호수", "Lakes", "湖", "湖泊"),
+    "opt.섬" to listOf("섬", "Islands", "島", "海岛"),
 
     // ---- 도보 ----
     "opt.괜찮아요" to listOf("괜찮아요", "Walking is fine", "大丈夫です", "没问题"),

@@ -50,11 +50,13 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
-import com.trevit.app.AGE_GROUPS
+import com.trevit.app.ACTIVITIES
 import com.trevit.app.AppState
+import com.trevit.app.COMPANIONS
 import com.trevit.app.FOOD_PREFS
-import com.trevit.app.GENDER_OPTIONS
 import com.trevit.app.KEYWORD_OPTIONS
+import com.trevit.app.MOODS
+import com.trevit.app.PACES
 import com.trevit.app.MAX_MUST_VISIT
 import com.trevit.app.PURPOSES
 import com.trevit.app.ProfileQuestion
@@ -111,6 +113,13 @@ fun ProfileScreen(state: AppState) {
             val question = ProfileQuestion.ordered[index]
             QuestionPage(question) {
                 when (question) {
+                    ProfileQuestion.TravelWith -> SingleChoice(
+                        options = COMPANIONS,
+                        selected = state.companion,
+                        wide = question.wide,
+                        onSelect = { state.companion = it },
+                    )
+
                     ProfileQuestion.Purpose -> MultiChoiceCustom(
                         options = PURPOSES,
                         selected = state.purposes,
@@ -118,28 +127,19 @@ fun ProfileScreen(state: AppState) {
                         customPlaceholder = tr("profile.purposePlaceholder"),
                     )
 
-                    ProfileQuestion.Gender -> SingleChoice(
-                        options = GENDER_OPTIONS,
-                        selected = when {
-                            state.gender != null -> state.gender
-                            state.genderNotSpecified -> "선택 안 함"
-                            else -> null
-                        },
-                        wide = question.wide,
-                        onSelect = { option ->
-                            state.gender = option.takeIf { it != "선택 안 함" }
-                            state.genderNotSpecified = option == "선택 안 함"
-                        },
+                    ProfileQuestion.Mood -> MultiChoiceCustom(
+                        options = MOODS,
+                        selected = state.moods,
+                        onToggle = state::toggleMood,
+                        customPlaceholder = tr("profile.moodPlaceholder"),
                     )
 
-                    ProfileQuestion.AgeGroup -> SingleChoice(
-                        options = AGE_GROUPS,
-                        selected = state.ageGroup,
-                        wide = question.wide,
-                        onSelect = { state.ageGroup = it },
+                    ProfileQuestion.Activities -> MultiChoiceCustom(
+                        options = ACTIVITIES,
+                        selected = state.activities,
+                        onToggle = state::toggleActivity,
+                        customPlaceholder = tr("profile.activitiesPlaceholder"),
                     )
-
-                    ProfileQuestion.Mbti -> MbtiChoice(state)
 
                     ProfileQuestion.Food -> MultiChoiceCustom(
                         options = FOOD_PREFS,
@@ -153,6 +153,13 @@ fun ProfileScreen(state: AppState) {
                         selected = state.keywords,
                         onToggle = state::toggleKeyword,
                         customPlaceholder = tr("profile.placesPlaceholder"),
+                    )
+
+                    ProfileQuestion.Pace -> SingleChoice(
+                        options = PACES,
+                        selected = state.pace,
+                        wide = question.wide,
+                        onSelect = { state.pace = it },
                     )
 
                     ProfileQuestion.MustVisit -> MustVisitInput(state)
@@ -187,15 +194,15 @@ private fun QuestionNav(state: AppState) {
     val last = state.questionIndex == state.questionCount - 1
 
     // 일정 제작에 꼭 필요한 질문 — 하나라도 선택해야 다음으로 넘어갈 수 있다
-    val required = question == ProfileQuestion.Purpose ||
-        question == ProfileQuestion.Gender ||
-        question == ProfileQuestion.AgeGroup ||
+    val required = question == ProfileQuestion.TravelWith ||
+        question == ProfileQuestion.Purpose ||
         question == ProfileQuestion.Food ||
+        question == ProfileQuestion.Pace ||
         question == ProfileQuestion.Walking
     val answered = when (question) {
+        ProfileQuestion.TravelWith -> state.companion != null
         ProfileQuestion.Purpose -> state.purposes.isNotEmpty()
-        ProfileQuestion.Gender -> state.gender != null || state.genderNotSpecified
-        ProfileQuestion.AgeGroup -> state.ageGroup != null
+        ProfileQuestion.Pace -> state.pace != null
         ProfileQuestion.Food -> state.foodPreferences.isNotEmpty()
         ProfileQuestion.Walking -> state.walkingAnswered
         else -> true
@@ -449,41 +456,6 @@ private fun CustomInputField(
             keyboardActions = KeyboardActions(onDone = { onSubmit() }),
             modifier = Modifier.fillMaxWidth(),
         )
-    }
-}
-
-/** 웹 `.ask-mbti` — 축마다 한 줄, 한 줄에 두 칸 */
-@Composable
-private fun MbtiChoice(state: AppState) {
-    Column(
-        Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(9.dp),
-    ) {
-        MbtiAxis('E' to 'I', state.mbtiEI) { state.mbtiEI = it }
-        MbtiAxis('S' to 'N', state.mbtiSN) { state.mbtiSN = it }
-        MbtiAxis('T' to 'F', state.mbtiTF) { state.mbtiTF = it }
-        MbtiAxis('J' to 'P', state.mbtiJP) { state.mbtiJP = it }
-    }
-}
-
-@Composable
-private fun MbtiAxis(
-    options: Pair<Char, Char>,
-    selected: Char?,
-    onSelect: (Char?) -> Unit,
-) {
-    Row(
-        Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        listOf(options.first, options.second).forEach { c ->
-            WebChip(
-                text = c.toString(),
-                selected = selected == c,
-                onClick = { onSelect(if (selected == c) null else c) },
-                modifier = Modifier.weight(1f),
-            )
-        }
     }
 }
 

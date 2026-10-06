@@ -46,14 +46,15 @@ enum class ProfileQuestion(
     val hint: String? = null,
     val wide: Boolean = false,
 ) {
+    TravelWith("👥", "누구와 함께 가세요?", "함께 즐기기 좋은 곳으로 골라 드려요"),
     Purpose("🧭", "어떤 여행을 원하세요?", "여러 개 고를 수 있어요"),
-    Gender("🙂", "성별을 알려주세요", "취향이 비슷한 여행자의 코스를 참고해요", wide = true),
-    AgeGroup("🎂", "연령대는 어떻게 되세요?"),
-    Mbti("🧩", "MBTI를 알려주세요", "모르면 건너뛰어도 괜찮아요"),
+    Mood("✨", "어떤 분위기가 좋아요?", "여러 개 고를 수 있어요"),
+    Activities("🎯", "꼭 해보고 싶은 게 있나요?", "매일 일정에 하나씩은 넣어 드려요"),
     Food("🍚", "어떤 음식을 좋아하세요?", "여러 개 고를 수 있어요"),
     Places("🏞️", "어떤 곳에 가고 싶으세요?", "여러 개 고를 수 있어요"),
-    MustVisit("📍", "꼭 가고 싶은 곳이 있나요?", "장소 이름을 적으면 일정에 꼭 넣어 드려요 (최대 5곳)"),
+    Pace("⏱️", "여행 페이스는 어떻게 할까요?", wide = true),
     Walking("🚶", "많이 걷는 건 괜찮으세요?", wide = true),
+    MustVisit("📍", "꼭 가고 싶은 곳이 있나요?", "장소 이름을 적으면 일정에 꼭 넣어 드려요 (최대 5곳)"),
     Note("💬", "더 알려주실 취향이 있나요?", "AI가 장소를 고를 때 참고해요"),
     ;
 
@@ -62,16 +63,50 @@ enum class ProfileQuestion(
     }
 }
 
+/**
+ * 전국 시·군 (값은 한국어 그대로 서버에 보낸다). 특별·광역시 → 도별 시 → 군 순.
+ * 이름이 겹치는 곳은 도 이름을 붙인다 ("강원 고성"·"경남 고성", 경기도 광주는 "경기광주").
+ */
 val REGIONS = listOf(
-    "서울", "인천", "강화", "수원", "가평", "양평", "파주", "포천", "용인",
-    "남양주", "이천", "여주", "화성", "시흥", "과천", "광주", "김포", "안산",
+    // 특별·광역·특별자치시
+    "서울", "부산", "대구", "인천", "광주", "대전", "울산", "세종",
+    // 경기
+    "수원", "성남", "고양", "용인", "부천", "안산", "안양", "남양주", "화성", "평택", "의정부", "시흥",
+    "파주", "김포", "광명", "경기광주", "군포", "오산", "이천", "양주", "안성", "구리", "포천", "의왕",
+    "하남", "여주", "동두천", "과천", "가평", "양평", "연천",
+    // 인천·부산·대구·울산의 군
+    "강화", "옹진", "기장", "달성", "군위", "울주",
+    // 강원
+    "춘천", "원주", "강릉", "동해", "태백", "속초", "삼척", "홍천", "횡성", "영월", "평창", "정선",
+    "철원", "화천", "양구", "인제", "강원 고성", "양양",
+    // 충북
+    "청주", "충주", "제천", "보은", "옥천", "영동", "증평", "진천", "괴산", "음성", "단양",
+    // 충남
+    "천안", "공주", "보령", "아산", "서산", "논산", "계룡", "당진", "금산", "부여", "서천", "청양",
+    "홍성", "예산", "태안",
+    // 전북
+    "전주", "군산", "익산", "정읍", "남원", "김제", "완주", "진안", "무주", "장수", "임실", "순창",
+    "고창", "부안",
+    // 전남
+    "목포", "여수", "순천", "나주", "광양", "담양", "곡성", "구례", "고흥", "보성", "화순", "장흥",
+    "강진", "해남", "영암", "무안", "함평", "영광", "장성", "완도", "진도", "신안",
+    // 경북
+    "포항", "경주", "김천", "안동", "구미", "영주", "영천", "상주", "문경", "경산", "의성", "청송",
+    "영양", "영덕", "청도", "고령", "성주", "칠곡", "예천", "봉화", "울진", "울릉",
+    // 경남
+    "창원", "진주", "통영", "사천", "김해", "밀양", "거제", "양산", "의령", "함안", "창녕", "경남 고성",
+    "남해", "하동", "산청", "함양", "거창", "합천",
+    // 제주
+    "제주", "서귀포",
 )
 
-val PURPOSES = listOf("휴양", "관광", "미식", "액티비티")
-val AGE_GROUPS = listOf("10대", "20대", "30대", "40대", "50대+")
-val FOOD_PREFS = listOf("한식", "양식", "일식", "중식", "상관없음")
-val KEYWORD_OPTIONS = listOf("산", "바다", "공원", "강")
-val GENDER_OPTIONS = listOf("남", "여", "선택 안 함")
+val COMPANIONS = listOf("혼자", "연인", "친구", "가족", "아이와 함께")
+val PURPOSES = listOf("휴양", "관광", "미식", "액티비티", "쇼핑", "문화·예술")
+val MOODS = listOf("힙한 핫플", "조용한 힐링", "로컬 감성", "전통·역사", "자연")
+val ACTIVITIES = listOf("카페 투어", "야경", "시장 구경", "전시·박물관", "산책", "사진 명소", "체험")
+val FOOD_PREFS = listOf("한식", "양식", "일식", "중식", "해산물", "디저트", "길거리 음식", "상관없음")
+val KEYWORD_OPTIONS = listOf("산", "바다", "공원", "강", "호수", "섬")
+val PACES = listOf("여유롭게", "적당히", "꽉 채워서")
 val WALKING_OPTIONS = listOf("괜찮아요", "적게 걷고 싶어요")
 const val NO_FOOD_PREFERENCE = "상관없음"
 const val MAX_MUST_VISIT = 5
@@ -223,22 +258,13 @@ class AppState(
     }
 
     // ---- 프로필 ----
-    var gender by mutableStateOf<String?>(null)       // "남" | "여" | null(선택 안 함)
-
-    /**
-     * "선택 안 함"을 명시적으로 고른 상태. [gender]는 두 경우 모두 null을 보내지만
-     * 설문 UI에서 "아직 안 고름"과 구분해 칩을 표시하려면 별도 플래그가 필요하다.
-     */
-    var genderNotSpecified by mutableStateOf(false)
-
     /** [avoidWalking]은 Boolean이라 "아직 안 고름"을 표현할 수 없어 별도 플래그를 둔다. */
     var walkingAnswered by mutableStateOf(false)
 
-    var ageGroup by mutableStateOf<String?>(null)
-    var mbtiEI by mutableStateOf<Char?>(null)
-    var mbtiSN by mutableStateOf<Char?>(null)
-    var mbtiTF by mutableStateOf<Char?>(null)
-    var mbtiJP by mutableStateOf<Char?>(null)
+    var companion by mutableStateOf<String?>(null)
+    val moods = mutableStateListOf<String>()
+    val activities = mutableStateListOf<String>()
+    var pace by mutableStateOf<String?>(null)
     val foodPreferences = mutableStateListOf<String>()
     var avoidWalking by mutableStateOf(false)
     val keywords = mutableStateListOf<String>()
@@ -275,12 +301,6 @@ class AppState(
 
     private val repository = PlanRepository()
 
-    private val mbtiOrNull: String?
-        get() {
-            val chars = listOfNotNull(mbtiEI, mbtiSN, mbtiTF, mbtiJP)
-            return if (chars.size == 4) chars.joinToString("") else null
-        }
-
     fun saveBaseUrl(url: String) {
         val cleaned = url.trim().ifBlank { DEFAULT_BASE_URL }
         baseUrl = cleaned
@@ -293,6 +313,14 @@ class AppState(
 
     fun togglePurpose(purpose: String) {
         if (!purposes.remove(purpose)) purposes.add(purpose)
+    }
+
+    fun toggleMood(mood: String) {
+        if (!moods.remove(mood)) moods.add(mood)
+    }
+
+    fun toggleActivity(activity: String) {
+        if (!activities.remove(activity)) activities.add(activity)
     }
 
     /** "상관없음"은 다른 음식과 함께 고를 수 없다 — 고르면 나머지를 비우고, 다른 걸 고르면 빠진다 */
@@ -312,19 +340,16 @@ class AppState(
         days = days,
         people = people,
         region = region,
-        gender = when (gender) {
-            "남" -> "MALE"
-            "여" -> "FEMALE"
-            else -> null
-        },
-        ageGroup = ageGroup,
-        mbti = mbtiOrNull,
         purpose = purposes.joinToString(", ").ifEmpty { null },
         foodPreference = foodPreferences.filter { it != NO_FOOD_PREFERENCE }.joinToString(", ").ifEmpty { null },
         avoidWalking = avoidWalking,
         keywords = keywords.toList().ifEmpty { null },
         preferenceNote = preferenceNote.trim().ifBlank { null },
         mustVisit = mustVisit.toList().ifEmpty { null },
+        companion = companion,
+        moods = moods.toList().ifEmpty { null },
+        activities = activities.toList().ifEmpty { null },
+        pace = pace,
         // 현재 위치가 있으면 1일차를 현재 위치에서 출발시킨다 (없으면 백엔드가 숙소 출발로 폴백)
         startLatitude = startLat,
         startLongitude = startLng,
