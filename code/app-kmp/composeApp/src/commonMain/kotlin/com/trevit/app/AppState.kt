@@ -173,8 +173,8 @@ class AppState(
     var region by mutableStateOf<String?>(REGIONS.first())
     val purposes = mutableStateListOf<String>()
     var budget by mutableStateOf(300_000L)
-    var days by mutableIntStateOf(2)            // 1~3일
-    var people by mutableIntStateOf(1)          // 1~4명
+    var days by mutableIntStateOf(2)            // 1일 이상 (상한 없음)
+    var people by mutableIntStateOf(1)          // 1명 이상 (상한 없음)
 
     /** 보유 토큰 (GET /api/wallet). 웹처럼 예산 슬라이더의 최대치가 된다. */
     var walletBalance by mutableStateOf<Long?>(null)

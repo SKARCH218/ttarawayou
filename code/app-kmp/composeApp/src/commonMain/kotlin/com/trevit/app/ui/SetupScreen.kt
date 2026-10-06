@@ -140,12 +140,12 @@ fun SetupScreen(state: AppState) {
                     Column(Modifier.weight(1f)) {
                         FieldLabel(tr("setup.days"))
                         Spacer(Modifier.height(8.dp))
-                        WebStepper(state.days, tr("setup.daysUnit"), { state.days = it }, 1..3)
+                        WebStepper(state.days, tr("setup.daysUnit"), { state.days = it }, 1..Int.MAX_VALUE)
                     }
                     Column(Modifier.weight(1f)) {
                         FieldLabel(tr("setup.people"))
                         Spacer(Modifier.height(8.dp))
-                        WebStepper(state.people, tr("setup.peopleUnit"), { state.people = it }, 1..4)
+                        WebStepper(state.people, tr("setup.peopleUnit"), { state.people = it }, 1..Int.MAX_VALUE)
                     }
                 }
             }
