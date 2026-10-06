@@ -76,8 +76,24 @@ class PlanService(
 
         // 장소 후보: TMAP POI 실시간 조회 → 키 없음/429/부족 시 수도권 시드 폴백
         val rawPool = placeProvider.places(anchorLat, anchorLng)
+
+        // 동선 압축: 후보는 반경 15km라 그대로 쓰면 동선이 10km 넘게 흩어진다.
+        // 장소가 가장 몰린 한 구역을 골라 그 근처 장소로만 일정을 짠다 (AI·알고리즘 공통).
+        // 사용자가 같은 지역(10km 이내)에 있으면 현재 위치 주변에서 구역을 찾아 첫 이동도 짧게 한다.
+        val userNearAnchor = userInArea && GeoUtil.distanceMeters(
+            anchorLat, anchorLng, req.startLatitude!!, req.startLongitude!!,
+        ) <= USER_NEAR_ANCHOR_M
         // 프로필·취향 반영: 걷기 기피 시 산·등산 장소 제외, 선호 키워드·음식 취향 가점
-        val pool = applyPreferences(rawPool, req)
+        val zone = focusZone(
+            applyPreferences(rawPool, req),
+            if (userNearAnchor) req.startLatitude!! else anchorLat,
+            if (userNearAnchor) req.startLongitude!! else anchorLng,
+            days,
+        )
+        val pool = zone.pool
+        val areaName = zone.label?.let { "$regionName $it 일대" } ?: regionName
+        log.info("구역 선택 [{}]: 반경 {}m, 숙박 {}, 식당 {}, 관광 {}", areaName, zone.radiusM.toInt(),
+            pool.lodgings.size, pool.restaurants.size, pool.attractions.size)
 
         // 꼭 가고 싶은 곳 — 이름으로 실제 장소를 찾는다 (걷기 기피로 걸러지기 전 원본에서, 최대 5곳)
         val mustNames = req.mustVisit.orEmpty().map { it.trim() }.filter { it.isNotEmpty() }.distinct().take(5)
@@ -87,7 +103,7 @@ class PlanService(
 
         // ---------- 1차: 로컬 AI(LM Studio)에게 프로필과 함께 플랜 요청 ----------
         val profile = PlanDtos.TravelProfile(
-            regionName = regionName,
+            regionName = areaName,
             gender = req.gender,
             ageGroup = req.ageGroup,
             mbti = req.mbti,
@@ -97,6 +113,7 @@ class PlanService(
             keywords = req.keywords.orEmpty(),
             preferenceNote = req.preferenceNote,
             mustVisit = mustPlaces,
+            language = req.language ?: "ko",
         )
         // ---------- 동선 최적화: 하루 = 동네 하나 ----------
         // 날마다 볼거리·맛집이 모인 동네 중심(허브)을 정하고, 그날 장소는 그 동네 안에서만 고른다.
@@ -192,8 +209,9 @@ class PlanService(
                 startName = lodging.name
                 startType = "LODGING"
             } else {
-                startLat = anchorLat
-                startLng = anchorLng
+                // 위치·숙소가 없으면 구역 중심에서 출발 (첫 이동이 짧게)
+                startLat = zone.lat
+                startLng = zone.lng
                 startName = "출발 지점"
                 startType = "START"
             }
@@ -297,7 +315,7 @@ class PlanService(
             budget, days, people, totalCost,
             budget - totalCost, breakdown, dayPlans, plannedBy, wallet.balance,
             aiReason = listOfNotNull(
-                ai?.reason ?: describePlan(req, regionName, days, usedPerDay),
+                ai?.reason ?: describePlan(req, regionName, zone.label, days, usedPerDay),
                 mustVisitNote(mustPlaces, mustMissing),
             ).joinToString(" "),
         )
@@ -383,7 +401,6 @@ class PlanService(
         )
     }
 
-    /** 휴리스틱 플랜에 대한 규칙 기반 설명 (AI가 이유를 못 준 경우 사용) */
     /** 꼭 가고 싶은 곳을 일자에 배정 — 플래너가 이미 넣은 날이 있으면 그날, 없으면 그날 장소들과 가장 가까운 날 */
     private fun assignMustVisit(perDay: List<List<Place>>, must: List<Place>, days: Int): List<List<Place>> {
         val out = List(days) { ArrayList<Place>() }
@@ -422,20 +439,92 @@ class PlanService(
         return parts.takeIf { it.isNotEmpty() }?.joinToString(" ")
     }
 
-    private fun describePlan(
-        req: PlanRequest, regionName: String, days: Int, usedPerDay: List<List<Place>>,
-    ): String {
-        val parts = ArrayList<String>()
-        val spots = usedPerDay.flatten().count { it.type == PlaceType.ATTRACTION }
-        val meals = usedPerDay.flatten().count { it.type == PlaceType.RESTAURANT }
-        parts += "${regionName} 중심으로 ${days}일 일정에 볼거리 ${spots}곳과 식사 ${meals}번을 배치했어요."
-        req.purpose?.let { parts += "'${it}' 목적에 맞게 이동 부담이 적은 순서로 묶었어요." }
-        if (req.avoidWalking) parts += "걷기 최소화를 켜셨으니 산·등산 코스는 빼고 이동 거리를 줄였어요."
-        req.keywords?.takeIf { it.isNotEmpty() }?.let { parts += "${it.joinToString("·")} 키워드에 맞는 장소를 우선 골랐어요." }
-        req.foodPreference?.takeIf { it != "상관없음" }?.let { parts += "식사는 ${it} 위주로 찾았어요." }
-        req.mbti?.let { parts += "${it} 성향도 참고했어요." }
-        return parts.joinToString(" ")
+    // ---------- 동선 압축: 한 구역 집중 ----------
+
+    /** 일정을 짤 구역 — 구역 안 장소만 담은 후보 풀 + 구역 중심 + 반경 + 동네 이름 */
+    private data class Zone(
+        val pool: PlaceProviderService.Pool,
+        val lat: Double,
+        val lng: Double,
+        val radiusM: Double,
+        val label: String?,
+    )
+
+    /**
+     * 후보(기준점 반경 15km)가 넓게 퍼져 있어 동선이 10km 넘게 나오는 문제를 막는다.
+     * 1) 검색 기준점 근처(4km)에서 볼거리·맛집이 가장 많이 몰린 지점(평점 가중)을 구역 중심으로 고르고
+     * 2) 일정에 필요한 만큼 모일 때까지 반경을 1.2km → 5km 로 넓혀 그 안의 장소만 남긴다.
+     * 구역 안에 장소가 모자라면 구역 중심에서 가까운 순으로 채운다.
+     */
+    private fun focusZone(
+        pool: PlaceProviderService.Pool,
+        searchLat: Double,
+        searchLng: Double,
+        days: Int,
+    ): Zone {
+        val spots = pool.attractions + pool.restaurants
+        if (spots.isEmpty()) return Zone(pool, searchLat, searchLng, 0.0, null)
+
+        fun dist(aLat: Double, aLng: Double, p: Place) =
+            GeoUtil.distanceMeters(aLat, aLng, p.latitude, p.longitude)
+
+        // 1) 핫스팟: 반경 1.2km 안 장소들의 평점 합이 가장 큰 지점 (기준점에서 멀수록 km당 0.3점 감점)
+        val candidates = spots.filter { dist(searchLat, searchLng, it) <= HOTSPOT_SEARCH_M }.ifEmpty { spots }
+        val center = candidates.maxBy { c ->
+            spots.sumOf { p -> if (dist(c.latitude, c.longitude, p) <= ZONE_RADII.first()) p.rating else 0.0 } -
+                dist(searchLat, searchLng, c) / 1000.0 * 0.3
+        }
+        val cLat = center.latitude
+        val cLng = center.longitude
+
+        // 2) 필요한 만큼 모일 때까지 반경 확장
+        val needAttr = days * 3
+        val needRest = days * 3
+        fun within(list: List<Place>, r: Double) = list.filter { dist(cLat, cLng, it) <= r }
+        val radius = ZONE_RADII.firstOrNull { r ->
+            within(pool.attractions, r).size >= needAttr && within(pool.restaurants, r).size >= needRest
+        } ?: ZONE_RADII.last()
+
+        // 구역 안이 모자라면 구역 중심에서 가까운 순으로 채운다 (먼 곳이 섞이지 않게)
+        fun pick(list: List<Place>, need: Int): List<Place> {
+            val inZone = within(list, radius)
+            return if (inZone.size >= need) inZone else list.sortedBy { dist(cLat, cLng, it) }.take(need)
+        }
+        val lodgings = within(pool.lodgings, maxOf(radius, LODGING_MIN_RADIUS_M))
+            .ifEmpty { pool.lodgings.sortedBy { dist(cLat, cLng, it) }.take(5) }
+
+        // 동네 이름 (예: "서울 중구 명동2가" → "명동2가")
+        val tokens = center.address.split(" ").filter { it.isNotBlank() }
+        val label = if (center.address.startsWith("주소")) null
+        else tokens.getOrNull(2)?.takeIf { !it.first().isDigit() } ?: tokens.getOrNull(1)
+
+        return Zone(
+            PlaceProviderService.Pool(
+                lodgings = lodgings,
+                restaurants = pick(pool.restaurants, needRest),
+                attractions = pick(pool.attractions, needAttr),
+                source = pool.source,
+            ),
+            cLat, cLng, radius, label,
+        )
     }
+
+    /** 휴리스틱 플랜에 대한 규칙 기반 설명 (AI가 이유를 못 준 경우 사용) — 앱 화면 언어로 */
+    private fun describePlan(
+        req: PlanRequest, regionName: String, zoneLabel: String?, days: Int, usedPerDay: List<List<Place>>,
+    ): String = PlanDescriber.describe(
+        lang = req.language,
+        regionName = regionName,
+        zoneLabel = zoneLabel,
+        days = days,
+        spots = usedPerDay.flatten().count { it.type == PlaceType.ATTRACTION },
+        meals = usedPerDay.flatten().count { it.type == PlaceType.RESTAURANT },
+        purpose = req.purpose,
+        avoidWalking = req.avoidWalking,
+        keywords = req.keywords,
+        foodPreference = req.foodPreference,
+        mbti = req.mbti,
+    )
 
     /** 숙박 예산을 최대한 활용: 예산 내 최고가 숙소 (동가면 평점 우선, 예산 내 없으면 최저가) */
     private fun pickLodging(lodgings: List<Place>, nights: Int, lodgingBudget: Long): Place =
@@ -711,6 +800,11 @@ class PlanService(
         private const val ZONE_CANDIDATES = 12   // 동네당 관광지·식당 후보 수 (AI 프롬프트 길이도 줄인다)
         private const val NEARBY_LODGINGS = 8
         private const val NEAR_REGION_M = 15_000.0  // 이 안이면 "그 지역에 와 있다"고 본다
+        // 동선 압축 — 한 구역 집중
+        private const val HOTSPOT_SEARCH_M = 4_000.0        // 구역 중심을 찾는 범위 (검색 기준점에서)
+        private val ZONE_RADII = listOf(1_200.0, 1_800.0, 2_500.0, 3_500.0, 5_000.0) // 구역 반경 확장 단계
+        private const val LODGING_MIN_RADIUS_M = 3_000.0    // 숙소는 구역보다 조금 넓게 찾는다
+        private const val USER_NEAR_ANCHOR_M = 10_000.0     // 사용자가 이 거리 안이면 현재 위치 주변에서 구역 탐색
         private val HHMM = DateTimeFormatter.ofPattern("HH:mm")
         private const val MEAL_MIN = 50          // 식사 시간
         private const val ATTRACTION_MIN = 60    // 관광지 이용 시간

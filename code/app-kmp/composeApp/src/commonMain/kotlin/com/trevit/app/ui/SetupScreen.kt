@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
@@ -60,6 +61,10 @@ import com.trevit.app.MIN_BUDGET
 import com.trevit.app.resources.*
 import com.trevit.app.REGIONS
 import com.trevit.app.Screen
+import com.trevit.app.i18n.LocalLanguage
+import com.trevit.app.i18n.optLabel
+import com.trevit.app.i18n.tokens
+import com.trevit.app.i18n.tr
 import com.trevit.shared.WalletProductDto
 import kotlinx.coroutines.launch
 
@@ -72,51 +77,32 @@ import kotlinx.coroutines.launch
 @Composable
 fun SetupScreen(state: AppState) {
     var regionQuery by remember { mutableStateOf("") }
-    var showSettings by remember { mutableStateOf(false) }
-    val scope = rememberCoroutineScope()
 
     LaunchedEffect(state.baseUrl) { state.loadWallet() }
 
     WebScreen {
-        // 상단 바 — 토큰 구매(항상) + 로그인 상태(닉네임/로그아웃, 있을 때만) + 서버 주소.
-        // 예전엔 이 자리와 우측 상단 절대 위치 버튼이 서로 겹쳤다 — 한 줄로 합쳐서 없앴다.
+        // 상단 바 — 닉네임(로그인 시) + 설정(톱니바퀴).
+        // 로그아웃은 설정 화면에, 토큰 구매는 보유 토큰 옆 + 버튼에 있다.
             Row(
                 Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.End,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                StoreButton(onClick = { state.openStore() })
                 state.auth.user?.let { user ->
-                    Spacer(Modifier.width(8.dp))
                     Text(
-                        "${user.nickname}님",
+                        tr("setup.nickname", user.nickname),
                         fontSize = 12.5.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = webTextFaint(),
                     )
-                    Surface(
-                        onClick = { scope.launch { state.auth.logout(); state.screen = Screen.Login } },
-                        shape = RoundedCornerShape(50),
-                        color = webFill(),
-                        border = BorderStroke(1.dp, webBorder()),
-                        modifier = Modifier.padding(start = 8.dp),
-                    ) {
-                        Text(
-                            "로그아웃",
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = webTextLabel(),
-                        )
-                    }
                 }
                 IconButton(
-                    onClick = { showSettings = true },
+                    onClick = { state.screen = Screen.Settings },
                     modifier = Modifier.size(32.dp),
                 ) {
                     Icon(
                         painterResource(Res.drawable.ic_settings),
-                        contentDescription = "서버 주소",
+                        contentDescription = tr("setup.settings"),
                         tint = webTextDecor().copy(alpha = 0.45f),
                         modifier = Modifier.size(18.dp),
                     )
@@ -127,16 +113,16 @@ fun SetupScreen(state: AppState) {
             // 웹 `.brand-logo { width: 92px; margin: 0 auto 6px }` — 원본 비율 134:113
             Icon(
                 painter = painterResource(Res.drawable.ic_travit_logo),
-                contentDescription = "트레빗",
+                contentDescription = tr("setup.logo"),
                 tint = BrandMint,
                 modifier = Modifier
                     .width(92.dp)
                     .height(78.dp),
             )
             Spacer(Modifier.height(6.dp))
-            GradientTitle("어디로 떠나볼까요?")
+            GradientTitle(tr("setup.title"))
             Spacer(Modifier.height(10.dp))
-            WebSubtitle("장소는 도착 전까지 비밀")
+            WebSubtitle(tr("setup.subtitle"))
 
             Spacer(Modifier.height(16.dp))
             TrevitCard(Modifier.fillMaxWidth()) {
@@ -152,14 +138,14 @@ fun SetupScreen(state: AppState) {
                 // 웹 `.field-row { display:flex; gap:10px }` — 기간·인원을 나란히
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     Column(Modifier.weight(1f)) {
-                        FieldLabel("기간")
+                        FieldLabel(tr("setup.days"))
                         Spacer(Modifier.height(8.dp))
-                        WebStepper(state.days, "일", { state.days = it }, 1..3)
+                        WebStepper(state.days, tr("setup.daysUnit"), { state.days = it }, 1..3)
                     }
                     Column(Modifier.weight(1f)) {
-                        FieldLabel("인원")
+                        FieldLabel(tr("setup.people"))
                         Spacer(Modifier.height(8.dp))
-                        WebStepper(state.people, "명", { state.people = it }, 1..4)
+                        WebStepper(state.people, tr("setup.peopleUnit"), { state.people = it }, 1..4)
                     }
                 }
             }
@@ -168,12 +154,12 @@ fun SetupScreen(state: AppState) {
 
             Spacer(Modifier.height(16.dp))
             PrimaryCta(
-                text = "다음",
+                text = tr("common.next"),
                 onClick = {
                     val balance = state.walletBalance ?: 0
                     if (state.budget > balance) {
                         state.setupError =
-                            "보유 토큰(${comma(balance)})이 부족해요. 토큰 구매 버튼을 눌러 주세요."
+                            state.t("setup.notEnoughTokens", comma(balance))
                     } else {
                         state.setupError = null
                         state.startProfile()
@@ -187,31 +173,6 @@ fun SetupScreen(state: AppState) {
     if (state.showStore) {
         StoreDialog(state)
     }
-
-    if (showSettings) {
-        var urlInput by remember { mutableStateOf(state.baseUrl) }
-        AlertDialog(
-            onDismissRequest = { showSettings = false },
-            title = { Text("서버 주소") },
-            text = {
-                OutlinedTextField(
-                    value = urlInput,
-                    onValueChange = { urlInput = it },
-                    label = { Text("Base URL") },
-                    singleLine = true,
-                )
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    state.saveBaseUrl(urlInput)
-                    showSettings = false
-                }) { Text("저장") }
-            },
-            dismissButton = {
-                TextButton(onClick = { showSettings = false }) { Text("취소") }
-            },
-        )
-    }
 }
 
 /** 웹 `.field` 의 지역 칸. select 대신 검색어 + 칩(`.chip`)으로 고른다. */
@@ -222,8 +183,9 @@ private fun RegionField(
     selected: String?,
     onSelect: (String) -> Unit,
 ) {
+    val lang = LocalLanguage.current
     Column {
-        FieldLabel("지역")
+        FieldLabel(tr("setup.region"))
         Spacer(Modifier.height(8.dp))
         // 웹 `.ds-select` — 패딩 11/12, radius 12, 1px mono-100, 배경 mono-050
         Row(
@@ -243,7 +205,7 @@ private fun RegionField(
             Spacer(Modifier.width(8.dp))
             Box(Modifier.weight(1f)) {
                 if (query.isEmpty()) {
-                    Text("지역 검색", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = webTextDim())
+                    Text(tr("setup.regionSearch"), fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = webTextDim())
                 }
                 BasicTextField(
                     value = query,
@@ -268,8 +230,12 @@ private fun RegionField(
                 .horizontalScroll(rememberScrollState()),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            REGIONS.filter { query.isBlank() || it.contains(query.trim()) }.forEach { region ->
-                WebChip(region, selected == region, { onSelect(region) }, compact = true)
+            // 검색어는 한국어 값 또는 현재 언어의 표시명 어느 쪽과 맞아도 된다
+            val q = query.trim()
+            REGIONS.filter {
+                q.isBlank() || it.contains(q) || optLabel(lang, it).contains(q, ignoreCase = true)
+            }.forEach { region ->
+                WebChip(optLabel(region), selected == region, { onSelect(region) }, compact = true)
             }
         }
     }
@@ -283,7 +249,7 @@ private fun BudgetField(state: AppState) {
     var editing by remember { mutableStateOf(false) }
 
     Column {
-        FieldLabel("예산")
+        FieldLabel(tr("setup.budget"))
         Spacer(Modifier.height(8.dp))
         if (editing) {
             BudgetInlineEditor(
@@ -326,7 +292,7 @@ private fun BudgetField(state: AppState) {
                 )
                 Spacer(Modifier.width(8.dp))
                 Text(
-                    "토큰",
+                    tr("setup.tokenUnit"),
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Bold,
                     color = webTextDim(),
@@ -358,19 +324,21 @@ private fun BudgetField(state: AppState) {
             )
         }
 
-        // 웹 `.wallet-row` — 점선 위에 "보유 N 토큰" (구매는 우측 상단 버튼으로 이동했다)
+        // 웹 `.wallet-row` — 점선 위에 "보유 N 토큰 (+)". + 를 누르면 토큰 구매 창이 열린다.
         Spacer(Modifier.height(14.dp))
         DashedDivider()
         Spacer(Modifier.height(12.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("보유 ", fontSize = 14.sp, color = webTextMuted())
+            Text(tr("setup.balance"), fontSize = 14.sp, color = webTextMuted())
             Text(
-                state.walletBalance?.let { "${comma(it)} 토큰" } ?: "…",
+                state.walletBalance?.let { tokens(it) } ?: "…",
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Bold,
                 // warning-dark 는 어두운 배경에서 묻히므로 다크에서는 한 단계 밝게
                 color = if (isDark()) WebOrange else WebOrangeDark,
             )
+            Spacer(Modifier.width(8.dp))
+            AddTokensButton(onClick = { state.openStore() })
         }
     }
 }
@@ -422,26 +390,22 @@ private fun BudgetInlineEditor(
     )
 }
 
-/** 우측 상단 "토큰 구매" 버튼 — 민트 배경으로 서버 주소 톱니바퀴보다 눈에 띄게 한다 */
+/** 보유 토큰 옆 민트색 동그란 + 버튼 — 누르면 토큰 구매 창 */
 @Composable
-private fun StoreButton(onClick: () -> Unit) {
+private fun AddTokensButton(onClick: () -> Unit) {
     Surface(
         onClick = onClick,
-        shape = RoundedCornerShape(50),
+        shape = CircleShape,
         color = WebMint,
+        modifier = Modifier.size(24.dp),
     ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
+        Box(contentAlignment = Alignment.Center) {
             Icon(
                 painterResource(Res.drawable.ic_add_plus),
-                contentDescription = null,
+                contentDescription = tr("setup.buyTokens"),
                 tint = Color.White,
-                modifier = Modifier.size(13.dp),
+                modifier = Modifier.size(14.dp),
             )
-            Spacer(Modifier.width(4.dp))
-            Text("토큰 구매", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
         }
     }
 }
@@ -457,17 +421,17 @@ private fun StoreDialog(state: AppState) {
 
     AlertDialog(
         onDismissRequest = { state.showStore = false },
-        title = { Text("토큰 구매") },
+        title = { Text(tr("setup.buyTokens")) },
         text = {
             Column {
                 Text(
-                    "1토큰 = 1원 고정환율 · 실제 결제 없이 바로 충전돼요",
+                    tr("setup.storeRate"),
                     fontSize = 12.sp,
                     color = webTextMuted(),
                 )
                 Spacer(Modifier.height(14.dp))
                 when {
-                    state.storeLoading -> Text("불러오는 중…", fontSize = 13.sp, color = webTextMuted())
+                    state.storeLoading -> Text(tr("setup.loading"), fontSize = 13.sp, color = webTextMuted())
                     state.storeError != null -> Text(
                         state.storeError!!,
                         fontSize = 13.sp,
@@ -487,7 +451,7 @@ private fun StoreDialog(state: AppState) {
             }
         },
         confirmButton = {
-            TextButton(onClick = { state.showStore = false }) { Text("닫기") }
+            TextButton(onClick = { state.showStore = false }) { Text(tr("common.close")) }
         },
     )
 }
@@ -509,7 +473,7 @@ private fun ProductRow(
     ) {
         Column {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("${comma(product.tokens)} 토큰", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = webText())
+                Text(tokens(product.tokens), fontSize = 15.sp, fontWeight = FontWeight.Bold, color = webText())
                 product.badge?.let {
                     Spacer(Modifier.width(6.dp))
                     Surface(shape = RoundedCornerShape(50), color = Color(0xFFDAF5EC)) {
@@ -532,7 +496,7 @@ private fun ProductRow(
         ) {
             Box(Modifier.padding(horizontal = 16.dp, vertical = 9.dp)) {
                 Text(
-                    if (pending) "…" else if (justPurchased) "구매 완료" else "구매",
+                    if (pending) "…" else if (justPurchased) tr("setup.purchased") else tr("setup.buy"),
                     fontSize = 12.5.sp,
                     fontWeight = FontWeight.Bold,
                     color = if (justPurchased) Color(0xFF009969) else Color.White,
@@ -566,4 +530,4 @@ fun ErrorBox(message: String) {
 }
 
 @Composable
-private fun isDark(): Boolean = androidx.compose.foundation.isSystemInDarkTheme()
+private fun isDark(): Boolean = isAppDark()

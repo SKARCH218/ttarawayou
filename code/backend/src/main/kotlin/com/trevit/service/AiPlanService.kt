@@ -116,10 +116,15 @@ class AiPlanService(
             .append("- 같은 장소를 두 번 넣지 마라\n")
             .append("- 중요: 예산을 최대한 다 써라. 장소 비용 합계(숙박+입장료x인원+식비x인원)가 ")
             .append("총예산의 75% 이상 88% 이하가 되도록 더 비싸고 평점 좋은 숙소·식당·관광지를 우선 선택하라. ")
-            .append("남는 예산을 최소화하라. 나머지는 교통비로 자동 사용되므로 88%는 절대 초과하지 마라\n\n")
+            .append("남는 예산을 최소화하라. 나머지는 교통비로 자동 사용되므로 88%는 절대 초과하지 마라\n")
+        // 여행자가 앱을 쓰는 언어로 reason 을 쓰게 한다 (장소 이름은 목록의 원래 이름 그대로)
+        val reasonLang = languageName(profile.language)
+        sb.append("- reason 은 반드시 ").append(reasonLang).append("로 작성하라. 다른 언어를 섞지 마라. ")
+            .append("단, 장소 이름은 목록에 적힌 이름을 그대로 써라\n\n")
             .append("반드시 아래 형식의 JSON 하나만 출력하라. 설명·주석 금지.\n")
             .append("{\"lodgingId\": 숫자, \"days\": [{\"stopIds\": [숫자, ...]}")
-        sb.append(", ...], \"reason\": \"이 여행자 프로필에 맞춰 왜 이렇게 계획했는지 한국어 1~3문장\"}")
+        sb.append(", ...], \"reason\": \"이 여행자 프로필에 맞춰 왜 이렇게 계획했는지 ")
+            .append(reasonLang).append(" 1~3문장\"}")
             .append("  (days 배열 길이는 정확히 ").append(days).append(")\n\n")
         sb.append(if (zones.isEmpty()) "장소 목록 (id|종류|이름|1인가격원|평점|위도|경도):\n"
             else "장소 목록 (id|종류|이름|1인가격원|평점|위도|경도|권역):\n")
@@ -139,6 +144,14 @@ class AiPlanService(
             sb.append('\n')
         }
         return sb.toString()
+    }
+
+    /** 앱 언어 코드 → 프롬프트에 쓸 언어 이름 */
+    private fun languageName(code: String): String = when (code.lowercase().take(2)) {
+        "en" -> "영어(English)"
+        "ja" -> "일본어(日本語)"
+        "zh" -> "중국어 간체(简体中文)"
+        else -> "한국어"
     }
 
     /** 사용자 프로필/취향을 프롬프트 블록으로 구성 (없는 항목은 생략) */

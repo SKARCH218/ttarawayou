@@ -4,6 +4,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import com.trevit.app.i18n.AppLanguage
+import com.trevit.app.i18n.serverMessage
+import com.trevit.app.i18n.translate
 import com.trevit.shared.AuthRepository
 import com.trevit.shared.LoginRequest
 import com.trevit.shared.SignupRequest
@@ -22,8 +25,16 @@ class AuthState(
     private val baseUrlProvider: () -> String,
     initialToken: String?,
     private val onTokenSaved: (String?) -> Unit,
+    /** 현재 화면 언어 — 오류 문구 번역용 */
+    private val languageProvider: () -> AppLanguage = { AppLanguage.KO },
 ) {
     private val repository = AuthRepository()
+
+    /** 상태 클래스 안에서 쓰는 번역 */
+    private fun t(key: String, vararg args: Any?): String = translate(languageProvider(), key, *args)
+
+    /** 서버가 준 한국어 문구를 현재 언어로 (모르는 문구는 그대로) */
+    private fun srv(message: String?): String? = serverMessage(languageProvider(), message)
 
     /** 저장된 로그인 토큰. null이면 로그인 화면부터 시작한다 */
     var token by mutableStateOf(initialToken)
@@ -143,10 +154,10 @@ class AuthState(
         val email = loginEmail.trim()
         val password = loginPassword
         if (email.isEmpty() || password.isEmpty()) {
-            errorMessage = "이메일과 비밀번호를 모두 입력해 주세요."
+            errorMessage = t("auth.err.loginEmpty")
             return false
         }
-        return run("로그인") {
+        return run(t("auth.action.login")) {
             val auth = repository.login(baseUrlProvider(), LoginRequest(email, password))
             saveSession(auth.token, auth.user)
         }
@@ -159,18 +170,18 @@ class AuthState(
     suspend fun sendCode(): Boolean {
         val email = signupEmail.trim()
         if (!EMAIL_REGEX.matches(email)) {
-            errorMessage = "이메일 형식이 올바르지 않아요."
+            errorMessage = t("auth.err.emailFormat")
             return false
         }
         sendingCode = true
         try {
-            return run("인증코드 발송") {
+            return run(t("auth.action.sendCode")) {
                 val seconds = repository.sendCode(baseUrlProvider(), email)
                 codeSent = true
                 codeSecondsLeft = seconds.toInt()
                 resendSecondsLeft = RESEND_COOLDOWN_SECONDS
                 signupCode = ""
-                setCodeMessage("메일로 받은 6자리 숫자를 입력해 주세요", isError = false)
+                setCodeMessage(t("auth.code.enterHint"), isError = false)
             }
         } finally {
             sendingCode = false
@@ -180,7 +191,7 @@ class AuthState(
     suspend fun verifyCode(): Boolean {
         val email = signupEmail.trim()
         if (signupCode.length != 6) {
-            setCodeMessage("인증번호 6자리를 입력해 주세요", isError = true)
+            setCodeMessage(t("auth.code.need6"), isError = true)
             return false
         }
         return try {
@@ -189,13 +200,13 @@ class AuthState(
             verifiedEmail = email.lowercase()
             codeSecondsLeft = 0
             resendSecondsLeft = 0
-            setCodeMessage("이메일 인증이 끝났어요", isError = false)
+            setCodeMessage(t("auth.code.verified"), isError = false)
             true
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
             // 코드 오류는 화면 하단이 아니라 입력칸 바로 아래에 보여준다
-            setCodeMessage(e.message ?: "인증번호를 확인하지 못했어요", isError = true)
+            setCodeMessage(srv(e.message) ?: t("auth.code.verifyFailed"), isError = true)
             false
         } finally {
             busy = false
@@ -220,7 +231,7 @@ class AuthState(
         if (codeSecondsLeft > 0) {
             codeSecondsLeft--
             if (codeSecondsLeft == 0 && verifiedEmail == null) {
-                setCodeMessage("인증번호가 만료됐어요. 다시 받아 주세요.", isError = true)
+                setCodeMessage(t("auth.code.expired"), isError = true)
             }
         }
         if (resendSecondsLeft > 0) resendSecondsLeft--
@@ -235,12 +246,12 @@ class AuthState(
         val nickname = signupNickname.trim()
 
         val problem = when {
-            !EMAIL_REGEX.matches(email) -> "이메일 형식이 올바르지 않아요."
-            !emailVerified && signupInviteCode.isBlank() -> "이메일 인증을 먼저 하거나 초대코드를 입력해 주세요."
-            nickname.length !in 2..12 -> "닉네임은 2~12자로 입력해 주세요."
-            !isPasswordStrong(signupPassword) -> "비밀번호는 영문과 숫자를 섞어 8자 이상이어야 해요."
-            signupPassword != signupPasswordConfirm -> "비밀번호가 서로 달라요."
-            !agreedToTerms -> "약관에 동의해야 가입할 수 있어요."
+            !EMAIL_REGEX.matches(email) -> t("auth.err.emailFormat")
+            !emailVerified && signupInviteCode.isBlank() -> t("auth.err.verifyOrInvite")
+            nickname.length !in 2..12 -> t("auth.err.nicknameLength")
+            !isPasswordStrong(signupPassword) -> t("auth.err.passwordWeak")
+            signupPassword != signupPasswordConfirm -> t("auth.err.passwordMismatch")
+            !agreedToTerms -> t("auth.err.terms")
             else -> null
         }
         if (problem != null) {
@@ -248,7 +259,7 @@ class AuthState(
             return false
         }
 
-        return run("회원가입") {
+        return run(t("auth.action.signup")) {
             val auth = repository.signup(
                 baseUrlProvider(),
                 SignupRequest(
@@ -265,6 +276,53 @@ class AuthState(
     }
 
     // ─────────────────────────────────────────────
+    // 계정 설정 (설정 화면) — 성공하면 null, 실패하면 보여줄 오류 문구
+    // ─────────────────────────────────────────────
+
+    /** 구글로 가입한 계정은 비밀번호가 없어 변경할 수 없다 */
+    val hasPassword: Boolean get() = user?.provider != "GOOGLE"
+
+    suspend fun changePassword(current: String, new: String, confirm: String): String? {
+        val saved = token ?: return t("settings.err.loginRequired")
+        when {
+            current.isEmpty() -> return t("settings.err.currentPasswordEmpty")
+            !isPasswordStrong(new) -> return t("settings.err.passwordWeak")
+            new != confirm -> return t("settings.err.passwordMismatch")
+            new == current -> return t("settings.err.passwordSame")
+        }
+        return account { repository.changePassword(baseUrlProvider(), saved, current, new) }
+    }
+
+    suspend fun changeNickname(nickname: String): String? {
+        val saved = token ?: return t("settings.err.loginRequired")
+        val value = nickname.trim()
+        if (value.length !in 2..12) return t("settings.err.nicknameLength")
+        if (value == user?.nickname) return null
+        return account { user = repository.changeNickname(baseUrlProvider(), saved, value) }
+    }
+
+    /** 회원 탈퇴 — 이메일 가입자는 비밀번호 확인이 필요하다. 성공하면 로그아웃 상태가 된다 */
+    suspend fun deleteAccount(password: String?): String? {
+        val saved = token ?: return t("settings.err.loginRequired")
+        if (hasPassword && password.isNullOrEmpty()) return t("settings.err.currentPasswordEmpty")
+        val error = account { repository.deleteAccount(baseUrlProvider(), saved, password) }
+        if (error == null) clearSession()
+        return error
+    }
+
+    private suspend fun account(block: suspend () -> Unit): String? = try {
+        busy = true
+        withContext(Dispatchers.Default) { block() }
+        null
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        srv(e.message) ?: t("settings.err.network")
+    } finally {
+        busy = false
+    }
+
+    // ─────────────────────────────────────────────
 
     /** 네트워크 호출 공통 처리 — busy 토글과 오류 메시지를 한곳에서 다룬다 */
     private suspend fun run(what: String, block: suspend () -> Unit): Boolean = try {
@@ -275,7 +333,7 @@ class AuthState(
     } catch (e: CancellationException) {
         throw e
     } catch (e: Exception) {
-        errorMessage = e.message ?: "${what}에 실패했어요 — 서버 연결을 확인해 주세요."
+        errorMessage = srv(e.message) ?: t("auth.err.failed", what)
         false
     } finally {
         busy = false

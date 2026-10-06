@@ -6,6 +6,9 @@ import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.ReadOnlyComposable
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import org.jetbrains.compose.resources.Font
@@ -87,12 +90,38 @@ val MysteryPurpleLight = OGQColors.secondary300
 val MintAccent = OGQColors.primary500
 val SunsetOrange = OGQColors.orange
 
+/** 화면 테마 설정 — 시스템을 따르거나 라이트/다크 고정 */
+enum class ThemeMode(val code: String) {
+    SYSTEM("system"),
+    LIGHT("light"),
+    DARK("dark"),
+    ;
+
+    companion object {
+        fun fromCode(code: String?): ThemeMode = entries.firstOrNull { it.code == code } ?: SYSTEM
+    }
+}
+
+/** 실제 적용 중인 다크 여부 (설정의 테마 모드 반영) — TrevitTheme 이 제공한다 */
+val LocalDarkTheme = compositionLocalOf { false }
+
+/** 기기 설정 대신 이 값을 쓴다 (설정에서 라이트/다크를 고정할 수 있으므로) */
 @Composable
-fun TrevitTheme(content: @Composable () -> Unit) {
-    val dark = isSystemInDarkTheme()
-    MaterialTheme(
-        colorScheme = if (dark) DarkColors else LightColors,
-        typography = AppTypography,
-        content = content,
-    )
+@ReadOnlyComposable
+fun isAppDark(): Boolean = LocalDarkTheme.current
+
+@Composable
+fun TrevitTheme(mode: ThemeMode = ThemeMode.SYSTEM, content: @Composable () -> Unit) {
+    val dark = when (mode) {
+        ThemeMode.SYSTEM -> isSystemInDarkTheme()
+        ThemeMode.LIGHT -> false
+        ThemeMode.DARK -> true
+    }
+    CompositionLocalProvider(LocalDarkTheme provides dark) {
+        MaterialTheme(
+            colorScheme = if (dark) DarkColors else LightColors,
+            typography = AppTypography,
+            content = content,
+        )
+    }
 }

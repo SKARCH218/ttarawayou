@@ -1,6 +1,7 @@
 package com.trevit.app.voice
 
 import android.speech.tts.TextToSpeech
+import com.trevit.app.i18n.AppLanguage
 import com.trevit.app.map.AndroidAppContext
 import java.util.Locale
 
@@ -8,22 +9,20 @@ import java.util.Locale
 private object AndroidVoice {
     private var tts: TextToSpeech? = null
     private var ready = false
-    private val pending = ArrayList<String>()
+    private var currentLang: AppLanguage? = null
+    private val pending = ArrayList<Pair<String, AppLanguage>>()
 
-    fun speak(text: String) {
+    fun speak(text: String, lang: AppLanguage) {
         if (ready) {
-            say(text)
+            say(text, lang)
             return
         }
-        pending.add(text)
+        pending.add(text to lang)
         if (tts != null) return
         val ctx = AndroidAppContext.context ?: return
         tts = TextToSpeech(ctx) { status ->
             ready = status == TextToSpeech.SUCCESS
-            if (ready) {
-                tts?.language = Locale.KOREAN
-                pending.forEach(::say)
-            }
+            if (ready) pending.forEach { (t, l) -> say(t, l) }
             pending.clear()
         }
     }
@@ -33,11 +32,21 @@ private object AndroidVoice {
         tts?.stop()
     }
 
-    private fun say(text: String) {
-        tts?.speak(text, TextToSpeech.QUEUE_ADD, null, text.hashCode().toString())
+    private fun say(text: String, lang: AppLanguage) {
+        val engine = tts ?: return
+        if (currentLang != lang) {
+            engine.language = when (lang) {
+                AppLanguage.KO -> Locale.KOREAN
+                AppLanguage.EN -> Locale.US
+                AppLanguage.JA -> Locale.JAPANESE
+                AppLanguage.ZH -> Locale.SIMPLIFIED_CHINESE
+            }
+            currentLang = lang
+        }
+        engine.speak(text, TextToSpeech.QUEUE_ADD, null, text.hashCode().toString())
     }
 }
 
-actual fun speak(text: String) = AndroidVoice.speak(text)
+actual fun speak(text: String, lang: AppLanguage) = AndroidVoice.speak(text, lang)
 
 actual fun stopSpeaking() = AndroidVoice.stop()

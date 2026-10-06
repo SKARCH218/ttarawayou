@@ -20,6 +20,7 @@ object PlanDtos {
         val keywords: List<String>? = null,   // 선호 키워드: 산 | 바다 | 공원 | 강
         val preferenceNote: String? = null,   // 자유 서술 취향 ("매운 음식 좋아요, 조용한 카페 위주로")
         val mustVisit: List<String>? = null,  // 꼭 가고 싶은 장소 이름 (예: ["경복궁","광장시장"])
+        val language: String? = null,         // 앱 화면 언어 ko | en | ja | zh — AI·설명 문구 언어
     )
 
     /** 플랜 생성에 쓰는 사용자 프로필/취향 (요청에서 추출, 내부 전달용) */
@@ -34,6 +35,8 @@ object PlanDtos {
         val keywords: List<String> = emptyList(),
         val preferenceNote: String? = null,
         val mustVisit: List<com.trevit.entity.Place> = emptyList(),
+        /** AI가 reason 을 쓸 언어 (ko | en | ja | zh) */
+        val language: String = "ko",
     ) {
         fun isEmpty(): Boolean =
             gender == null && ageGroup == null && mbti == null && purpose == null &&

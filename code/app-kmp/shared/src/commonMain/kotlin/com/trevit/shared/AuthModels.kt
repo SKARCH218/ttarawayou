@@ -38,7 +38,21 @@ data class UserDto(
     val id: Long,
     val email: String,
     val nickname: String,
+    /** LOCAL(이메일 가입) | GOOGLE — 구글 계정은 비밀번호가 없다 */
+    val provider: String = "LOCAL",
 )
+
+/** POST /api/auth/password — 비밀번호 변경 */
+@Serializable
+data class ChangePasswordRequest(val currentPassword: String, val newPassword: String)
+
+/** POST /api/auth/nickname — 닉네임 변경 */
+@Serializable
+data class ChangeNicknameRequest(val nickname: String)
+
+/** POST /api/auth/withdraw — 회원 탈퇴 (이메일 가입자는 비밀번호 확인) */
+@Serializable
+data class WithdrawRequest(val password: String? = null)
 
 /** 로그인·회원가입 성공 응답 */
 @Serializable

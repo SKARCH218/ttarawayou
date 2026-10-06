@@ -25,6 +25,8 @@ data class PlanRequest(
     val mustVisit: List<String>? = null, // 꼭 가고 싶은 장소 이름
     val startLatitude: Double? = null,
     val startLongitude: Double? = null,
+    /** 화면 언어 (ko | en | ja | zh) — AI 설명·플랜 설명 문구를 이 언어로 쓴다 */
+    val language: String? = null,
 )
 
 /** GET /api/wallet · POST /api/wallet/reset · POST /api/wallet/purchase 응답 */

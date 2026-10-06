@@ -35,7 +35,21 @@ object AuthDtos {
         val id: Long,
         val email: String,
         val nickname: String,
+        /** LOCAL(이메일 가입) | GOOGLE — 앱 설정에서 비밀번호 변경 가능 여부를 판단한다 */
+        val provider: String = "LOCAL",
     )
+
+    /** 비밀번호 변경 요청 (설정 화면) */
+    data class ChangePasswordRequest(
+        val currentPassword: String = "",
+        val newPassword: String = "",
+    )
+
+    /** 닉네임 변경 요청 (설정 화면) */
+    data class ChangeNicknameRequest(val nickname: String = "")
+
+    /** 회원 탈퇴 요청 — 이메일 가입자는 비밀번호 확인 필요 */
+    data class WithdrawRequest(val password: String? = null)
 
     /** 로그인·회원가입 성공 응답 */
     data class AuthResponse(

@@ -27,15 +27,16 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.trevit.app.AppState
 import com.trevit.app.Screen
+import com.trevit.app.i18n.tr
 import kotlinx.coroutines.delay
 
-/** 웹 `js/ask.js` 의 LOADING_MESSAGES — 2.6초마다 바뀐다 */
+/** 웹 `js/ask.js` 의 LOADING_MESSAGES — 2.6초마다 바뀐다 (번역 키) */
 private val LOADING_MESSAGES = listOf(
-    "예산을 배분하고 있어요",
-    "취향에 맞는 장소를 고르는 중이에요",
-    "예산을 알뜰하게 쓰는 조합을 찾고 있어요",
-    "버스 노선과 도보 경로를 살피는 중이에요",
-    "경로를 숨기는 중",
+    "gen.msg.budget",
+    "gen.msg.places",
+    "gen.msg.combo",
+    "gen.msg.routes",
+    "gen.msg.hide",
 )
 
 /**
@@ -72,7 +73,7 @@ fun GeneratingScreen(state: AppState) {
         // 웹 `.loading-overlay { gap: 20px }`
         Spacer(Modifier.height(20.dp))
         Text(
-            "AI가 계획을 세우는 중",
+            tr("gen.title"),
             fontSize = 14.5.sp,
             lineHeight = 25.sp,
             fontWeight = FontWeight.Bold,
@@ -80,7 +81,7 @@ fun GeneratingScreen(state: AppState) {
             textAlign = TextAlign.Center,
         )
         Text(
-            LOADING_MESSAGES[messageIndex],
+            tr(LOADING_MESSAGES[messageIndex]),
             fontSize = 14.5.sp,
             lineHeight = 25.sp,
             color = webTextLabel(),
@@ -90,7 +91,7 @@ fun GeneratingScreen(state: AppState) {
         Spacer(Modifier.height(24.dp))
         val interaction = remember { MutableInteractionSource() }
         Text(
-            "취소",
+            tr("common.cancel"),
             modifier = Modifier
                 .clickable(interactionSource = interaction, indication = null) {
                     state.screen = Screen.Profile

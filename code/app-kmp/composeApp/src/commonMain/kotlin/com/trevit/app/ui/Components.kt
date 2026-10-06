@@ -51,6 +51,7 @@ import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
+import com.trevit.app.i18n.tr
 import com.trevit.app.resources.*
 
 /**
@@ -114,77 +115,77 @@ private val Mono990 = Color(0xFF262D2E)
 /** 웹 `body` 배경 (mono-030) */
 @Composable
 @ReadOnlyComposable
-fun webBg(): Color = if (isSystemInDarkTheme()) Color(0xFF181D1E) else Mono030
+fun webBg(): Color = if (isAppDark()) Color(0xFF181D1E) else Mono030
 
 /** 카드·시트의 흰 면 (mono-000) */
 @Composable
 @ReadOnlyComposable
-fun webSurface(): Color = if (isSystemInDarkTheme()) Color(0xFF202627) else Color.White
+fun webSurface(): Color = if (isAppDark()) Color(0xFF202627) else Color.White
 
 /** 옅은 채움 (mono-050) — 칩·스테퍼 버튼 배경 */
 @Composable
 @ReadOnlyComposable
-fun webFill(): Color = if (isSystemInDarkTheme()) Color(0xFF2C3435) else Mono050
+fun webFill(): Color = if (isAppDark()) Color(0xFF2C3435) else Mono050
 
 /** 얇은 경계선 (mono-080) — 카드 테두리·점선 구분선 */
 @Composable
 @ReadOnlyComposable
-fun webBorder(): Color = if (isSystemInDarkTheme()) Color(0xFF394344) else Mono080
+fun webBorder(): Color = if (isAppDark()) Color(0xFF394344) else Mono080
 
 /** 또렷한 경계선 (mono-100) — 입력·칩 테두리 */
 @Composable
 @ReadOnlyComposable
-fun webBorderStrong(): Color = if (isSystemInDarkTheme()) Color(0xFF44504F) else Mono100
+fun webBorderStrong(): Color = if (isAppDark()) Color(0xFF44504F) else Mono100
 
 /** 본문 진한 글자 (mono-990) */
 @Composable
 @ReadOnlyComposable
-fun webText(): Color = if (isSystemInDarkTheme()) Color(0xFFEDF1F1) else Mono990
+fun webText(): Color = if (isAppDark()) Color(0xFFEDF1F1) else Mono990
 
 /** 칩 글자 (mono-800) */
 @Composable
 @ReadOnlyComposable
-fun webTextChip(): Color = if (isSystemInDarkTheme()) Color(0xFFD3DCDC) else Mono800
+fun webTextChip(): Color = if (isAppDark()) Color(0xFFD3DCDC) else Mono800
 
 /** 라벨 (mono-700) */
 @Composable
 @ReadOnlyComposable
-fun webTextLabel(): Color = if (isSystemInDarkTheme()) Color(0xFFB6C2C2) else Mono700
+fun webTextLabel(): Color = if (isAppDark()) Color(0xFFB6C2C2) else Mono700
 
 /** 보조 설명 (mono-600) */
 @Composable
 @ReadOnlyComposable
-fun webTextMuted(): Color = if (isSystemInDarkTheme()) Color(0xFFA7B6B9) else Mono600
+fun webTextMuted(): Color = if (isAppDark()) Color(0xFFA7B6B9) else Mono600
 
 /** 흐린 설명 (mono-500) */
 @Composable
 @ReadOnlyComposable
-fun webTextFaint(): Color = if (isSystemInDarkTheme()) Color(0xFF92A5A8) else Mono500
+fun webTextFaint(): Color = if (isAppDark()) Color(0xFF92A5A8) else Mono500
 
 /** 가장 흐린 글자·단위 (mono-400) */
 @Composable
 @ReadOnlyComposable
-fun webTextDim(): Color = if (isSystemInDarkTheme()) Color(0xFF8A9C9F) else Mono400
+fun webTextDim(): Color = if (isAppDark()) Color(0xFF8A9C9F) else Mono400
 
 /** 화살표 등 장식 (mono-300) */
 @Composable
 @ReadOnlyComposable
-fun webTextDecor(): Color = if (isSystemInDarkTheme()) Color(0xFF6E7E80) else Mono300
+fun webTextDecor(): Color = if (isAppDark()) Color(0xFF6E7E80) else Mono300
 
 /** 선택된 칩 배경 (primary-050) */
 @Composable
 @ReadOnlyComposable
-fun webChipOnFill(): Color = if (isSystemInDarkTheme()) Color(0xFF10453A) else WebMintPale
+fun webChipOnFill(): Color = if (isAppDark()) Color(0xFF10453A) else WebMintPale
 
 /** 선택된 칩 글자 */
 @Composable
 @ReadOnlyComposable
-fun webChipOnText(): Color = if (isSystemInDarkTheme()) Color(0xFF7FDEC1) else WebMintText
+fun webChipOnText(): Color = if (isAppDark()) Color(0xFF7FDEC1) else WebMintText
 
 /** 선택된 칩 테두리 (primary-300/400) */
 @Composable
 @ReadOnlyComposable
-fun webChipOnBorder(): Color = if (isSystemInDarkTheme()) Color(0xFF2E7C66) else Color(0xFF28C799)
+fun webChipOnBorder(): Color = if (isAppDark()) Color(0xFF2E7C66) else Color(0xFF28C799)
 
 // ─────────────────────────────────────────────────────────────
 // 모양 (ogq-radius-*)
@@ -229,7 +230,7 @@ fun WebScreen(
 @Composable
 @ReadOnlyComposable
 fun titleBrush(): Brush {
-    val dark = isSystemInDarkTheme()
+    val dark = isAppDark()
     return Brush.linearGradient(
         listOf(
             if (dark) WebPurpleLight else WebPurple,
@@ -591,7 +592,7 @@ fun WebStepper(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        StepperButton(Res.drawable.ic_remove_minus, "감소", value > range.first) { onChange(value - 1) }
+        StepperButton(Res.drawable.ic_remove_minus, tr("comp.decrease"), value > range.first) { onChange(value - 1) }
         Column(
             Modifier.weight(1f),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -605,7 +606,7 @@ fun WebStepper(
                 color = webTextDim(),
             )
         }
-        StepperButton(Res.drawable.ic_add_plus, "증가", value < range.last) { onChange(value + 1) }
+        StepperButton(Res.drawable.ic_add_plus, tr("comp.increase"), value < range.last) { onChange(value + 1) }
     }
 }
 

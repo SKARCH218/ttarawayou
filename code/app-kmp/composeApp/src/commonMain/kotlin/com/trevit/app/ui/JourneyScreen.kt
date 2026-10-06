@@ -79,10 +79,14 @@ import com.trevit.app.map.locationUpdates
 import com.trevit.app.map.stopEmoji
 import com.trevit.app.map.stopTypeLabel
 import com.trevit.app.oneDecimal
+import com.trevit.app.i18n.AppLanguage
+import com.trevit.app.i18n.LocalLanguage
+import com.trevit.app.i18n.tokens
+import com.trevit.app.i18n.tr
+import com.trevit.app.i18n.translate
 import com.trevit.app.voice.speak
 import com.trevit.app.voice.spokenDistance
 import com.trevit.app.voice.stopSpeaking
-import com.trevit.app.won
 import com.trevit.shared.StopDto
 import com.trevit.shared.TileFetcher
 import kotlinx.coroutines.Dispatchers
@@ -220,40 +224,45 @@ fun JourneyScreen(state: AppState, dayIndex: Int) {
     } else -1
 
     // ---- 다음 장소 힌트: 가까워질수록 하나씩 열린다 ----
-    val hints = remember(dayIndex, legIndex) { nextStop?.let(::buildHints).orEmpty() }
+    val lang = LocalLanguage.current
+    val hints = remember(dayIndex, legIndex, lang) { nextStop?.let { buildHints(it, lang) }.orEmpty() }
     val legProgress = (distOnLeg / currentGeom.lengthMeters).coerceIn(0.0, 1.0)
     val unlockedHints = hints.count { legProgress >= it.at }
     var showHints by remember(dayIndex) { mutableStateOf(false) }
 
-    // ---- 음성 안내 ----
-    val say: (String) -> Unit = { if (state.voiceEnabled) speak(it) }
+    // ---- 음성 안내 (화면 언어로 읽는다) ----
+    val say: (String) -> Unit = { if (state.voiceEnabled) speak(it, lang) }
+    fun t(key: String, vararg args: Any?) = translate(lang, key, *args)
     LaunchedEffect(legIndex, unlockedHints) {
         // 첫 힌트(종류)는 구간 시작 안내와 겹치므로 두 번째부터 읽는다
-        if (unlockedHints >= 2) say("새 힌트가 열렸어요. ${hints[unlockedHints - 1].text}")
+        if (unlockedHints >= 2) say(t("voice.newHint", hints[unlockedHints - 1].text))
     }
     DisposableEffect(Unit) { onDispose { stopSpeaking() } }
     LaunchedEffect(legIndex) {
-        val how = if (currentLeg.mode == "TRANSIT") "대중교통으로" else "걸어서"
-        say("다음 비밀 장소까지 ${spokenDistance(currentGeom.lengthMeters)}, $how 약 ${currentLeg.durationMinutes}분이에요. 보라색 길을 따라가세요.")
+        val key = if (currentLeg.mode == "TRANSIT") "voice.legTransit" else "voice.legWalk"
+        say(t(key, spokenDistance(currentGeom.lengthMeters, lang), currentLeg.durationMinutes))
     }
     LaunchedEffect(legIndex, currentSegIndex) {
-        if (currentSegIndex >= 0) transitSegments[currentSegIndex].description?.let(say)
+        // 구간 설명은 서버가 한국어로 주므로 한국어 화면에서만 읽는다
+        if (currentSegIndex >= 0 && lang == AppLanguage.KO) transitSegments[currentSegIndex].description?.let(say)
     }
     LaunchedEffect(legIndex, currentSegIndex, remainingStops) {
         when (remainingStops) {
-            1 -> say("다음 정거장에서 내릴 준비를 하세요.")
-            0 -> say("이번 정거장에서 내리세요.")
+            1 -> say(t("voice.alightNext"))
+            0 -> say(t("voice.alightNow"))
         }
     }
     val near = remainMeters <= 100.0 && currentGeom.lengthMeters > 200.0
     LaunchedEffect(legIndex, near) {
-        if (near) say("비밀 장소까지 100미터 남았어요.")
+        if (near) say(t("voice.near"))
     }
     LaunchedEffect(revealStop) {
-        revealStop?.let { s -> say("도착했어요! 이곳은 ${stopTypeLabel(s.type)}, ${s.name ?: "비밀 장소"}입니다.") }
+        revealStop?.let { s ->
+            say(t("voice.arrived", stopTypeLabel(s.type, lang), s.name ?: t("journey.mysteryPlace")))
+        }
     }
     LaunchedEffect(completed) {
-        if (completed) say("오늘의 여정을 모두 마쳤어요. 수고하셨어요!")
+        if (completed) say(t("voice.dayDone"))
     }
 
     Box(Modifier.fillMaxSize()) {
@@ -282,14 +291,14 @@ fun JourneyScreen(state: AppState, dayIndex: Int) {
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
                     Text(
-                        "Day ${dayPlan.day} 여정",
+                        tr("journey.title", dayPlan.day),
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Bold,
                         color = webText(),
                     )
                     Spacer(Modifier.height(2.dp))
                     Text(
-                        "다음 비밀 장소까지 ${formatDistance(remainMeters)} · 약 ${remainMinutes}분",
+                        tr("journey.toNext", formatDistance(remainMeters), remainMinutes),
                         fontSize = 12.sp,
                         color = webTextMuted(),
                         maxLines = 1,
@@ -305,7 +314,7 @@ fun JourneyScreen(state: AppState, dayIndex: Int) {
 
             // ---- 웹 `.progress-pill` ----
             MapPill(
-                "비밀 장소 $revealedCount / ${geoms.size}",
+                tr("journey.progress", revealedCount, geoms.size),
                 Modifier.align(Alignment.CenterHorizontally),
             )
 
@@ -336,7 +345,11 @@ fun JourneyScreen(state: AppState, dayIndex: Int) {
                     prefix + (transitSegments[currentSegIndex].description ?: "")
                 } else {
                     currentLeg.summary
-                        ?: "${currentLeg.boardStop ?: "정류장"} 승차 → ${currentLeg.alightStop ?: "정류장"} 하차"
+                        ?: tr(
+                            "journey.boardAlight",
+                            currentLeg.boardStop ?: tr("journey.stopFallback"),
+                            currentLeg.alightStop ?: tr("journey.stopFallback"),
+                        )
                 }
                 MapPill(
                     segLabel,
@@ -349,8 +362,8 @@ fun JourneyScreen(state: AppState, dayIndex: Int) {
                 if (remainingStops >= 0) {
                     Spacer(Modifier.height(6.dp))
                     MapPill(
-                        if (remainingStops == 0) "이번 정거장에서 하차하세요"
-                        else "하차까지 ${remainingStops}정거장",
+                        if (remainingStops == 0) tr("journey.alightNow")
+                        else tr("journey.stopsLeft", remainingStops),
                         Modifier.align(Alignment.CenterHorizontally),
                         color = WebOrangeDark,
                     )
@@ -362,10 +375,10 @@ fun JourneyScreen(state: AppState, dayIndex: Int) {
             // ---- 웹 `.mystery-hint` — 지도 위에 뜨는 안내 ----
             MysteryHint(
                 when {
-                    liveMode && liveFix == null -> "현재 위치를 찾는 중이에요 — 위치 권한과 GPS를 확인해 주세요"
-                    liveMode -> "실제로 걸어서 보라색 길을 따라가세요"
-                    playing -> "보라색 길을 따라가는 중이에요"
-                    else -> "보라색 길을 따라가세요 — 시뮬레이션을 눌러 주세요"
+                    liveMode && liveFix == null -> tr("journey.hintLiveWaiting")
+                    liveMode -> tr("journey.hintLive")
+                    playing -> tr("journey.hintPlaying")
+                    else -> tr("journey.hintIdle")
                 },
                 Modifier.padding(horizontal = 16.dp),
             )
@@ -378,13 +391,13 @@ fun JourneyScreen(state: AppState, dayIndex: Int) {
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 SimButton(
-                    "시뮬레이션 모드",
+                    tr("journey.modeSim"),
                     primary = false,
                     selected = !liveMode,
                     modifier = Modifier.weight(1f),
                 ) { liveMode = false }
                 SimButton(
-                    "실시간 모드",
+                    tr("journey.modeLive"),
                     primary = false,
                     selected = liveMode,
                     modifier = Modifier.weight(1f),
@@ -404,12 +417,12 @@ fun JourneyScreen(state: AppState, dayIndex: Int) {
             ) {
                 if (liveMode) {
                     MapPill(
-                        if (liveFix == null) "GPS 신호 대기 중" else "GPS 추적 중 · 도착 반경 ${ARRIVE_RADIUS_M.toInt()}m",
+                        if (liveFix == null) tr("journey.gpsWaiting") else tr("journey.gpsTracking", ARRIVE_RADIUS_M.toInt()),
                         Modifier.weight(1f),
                     )
                 } else {
                     SimButton(
-                        text = if (playing) "일시정지" else "시뮬레이션",
+                        text = if (playing) tr("journey.pause") else tr("journey.simulate"),
                         primary = true,
                         enabled = revealStop == null && !completed,
                         modifier = Modifier.weight(1f),
@@ -463,7 +476,7 @@ private fun JourneyMap(
     revealedCount: Int,
 ) {
     val colorScheme = MaterialTheme.colorScheme
-    val darkMap = isSystemInDarkTheme()
+    val darkMap = isAppDark()
     val pulse by rememberInfiniteTransition(label = "pulse").animateFloat(
         0f, 1f,
         infiniteRepeatable(tween(1400, easing = LinearEasing)),
@@ -696,7 +709,7 @@ private fun MapBackButton(onClick: () -> Unit) {
         Box(contentAlignment = Alignment.Center) {
             Icon(
                 painterResource(Res.drawable.ic_chevron_left),
-                contentDescription = "뒤로",
+                contentDescription = tr("journey.backCd"),
                 tint = WebMintDeep,
                 modifier = Modifier.size(20.dp),
             )
@@ -860,7 +873,7 @@ private fun RevealOverlay(stop: StopDto, isLast: Boolean, onContinue: () -> Unit
                     )
                     Spacer(Modifier.height(12.dp))
                     Text(
-                        if (isLast) "오늘의 여정 완료! 마지막 장소는…" else "도착! 이곳은…",
+                        if (isLast) tr("journey.revealLast") else tr("journey.revealArrived"),
                         fontSize = 12.sp,
                         letterSpacing = 3.sp,
                         color = webTextFaint(),
@@ -868,7 +881,7 @@ private fun RevealOverlay(stop: StopDto, isLast: Boolean, onContinue: () -> Unit
                     )
                     Spacer(Modifier.height(8.dp))
                     Text(
-                        stop.name ?: "미스터리 장소",
+                        stop.name ?: tr("journey.mysteryPlace"),
                         fontSize = 24.sp,
                         lineHeight = 32.sp,
                         fontWeight = FontWeight.Bold,
@@ -893,7 +906,7 @@ private fun RevealOverlay(stop: StopDto, isLast: Boolean, onContinue: () -> Unit
                     Spacer(Modifier.height(16.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
                         Text(
-                            stopTypeLabel(stop.type),
+                            stopTypeLabel(stop.type, LocalLanguage.current),
                             fontSize = 14.sp,
                             fontWeight = FontWeight.Bold,
                             color = WebMint,
@@ -908,7 +921,7 @@ private fun RevealOverlay(stop: StopDto, isLast: Boolean, onContinue: () -> Unit
                         }
                         if (stop.cost > 0) {
                             Text(
-                                won(stop.cost),
+                                tokens(stop.cost),
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = WebMint,
@@ -917,7 +930,7 @@ private fun RevealOverlay(stop: StopDto, isLast: Boolean, onContinue: () -> Unit
                     }
                     Spacer(Modifier.height(22.dp))
                     PrimaryCta(
-                        text = if (isLast) "여정 마치기" else "다음 비밀 장소로 →",
+                        text = if (isLast) tr("journey.finish") else tr("journey.nextPlace"),
                         onClick = onContinue,
                         modifier = Modifier.fillMaxWidth(),
                     )
@@ -1009,14 +1022,14 @@ private fun CompletionOverlay(state: AppState, dayIndex: Int) {
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Text(
-                    if (hasNextDay) "Day ${dayPlan.day} 완료" else "여행 완료",
+                    if (hasNextDay) tr("journey.dayDone", dayPlan.day) else tr("journey.tripDone"),
                     fontSize = 24.sp,
                     fontWeight = FontWeight.Bold,
                     color = webText(),
                 )
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    "오늘 쓴 비용 ${won(dayPlan.dayCost)}",
+                    tr("journey.todayCost", tokens(dayPlan.dayCost)),
                     fontSize = 13.sp,
                     color = webTextMuted(),
                 )
@@ -1039,7 +1052,7 @@ private fun CompletionOverlay(state: AppState, dayIndex: Int) {
                         )
                         if (stop.cost > 0) {
                             Text(
-                                won(stop.cost),
+                                tokens(stop.cost),
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = WebMint,
@@ -1052,7 +1065,7 @@ private fun CompletionOverlay(state: AppState, dayIndex: Int) {
                     DashedDivider()
                     Spacer(Modifier.height(12.dp))
                     Text(
-                        "총 비용 ${won(plan.totalCost)} · 남는 예산 ${won(plan.remainingBudget)}",
+                        tr("journey.totalSummary", tokens(plan.totalCost), tokens(plan.remainingBudget)),
                         fontSize = 13.5.sp,
                         fontWeight = FontWeight.Bold,
                         color = webText(),
@@ -1061,7 +1074,7 @@ private fun CompletionOverlay(state: AppState, dayIndex: Int) {
                 }
                 Spacer(Modifier.height(22.dp))
                 PrimaryCta(
-                    text = if (hasNextDay) "Day ${dayPlan.day + 1} 시작" else "플랜으로 돌아가기",
+                    text = if (hasNextDay) tr("journey.startDay", dayPlan.day + 1) else tr("journey.backToPlan"),
                     onClick = {
                         state.screen = if (hasNextDay) {
                             Screen.Journey(dayIndex + 1)

@@ -31,6 +31,7 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.trevit.app.resources.*
+import com.trevit.app.i18n.tr
 
 /**
  * 로그인·회원가입 화면 전용 조각들.
@@ -113,7 +114,7 @@ fun PasswordToggle(visible: Boolean, onToggle: () -> Unit) {
         Box(contentAlignment = Alignment.Center) {
             Icon(
                 painter = painterResource(if (visible) Res.drawable.ic_hide else Res.drawable.ic_show),
-                contentDescription = if (visible) "비밀번호 숨기기" else "비밀번호 표시",
+                contentDescription = if (visible) tr("auth.pw.hide") else tr("auth.pw.show"),
                 tint = webTextDim(),
                 modifier = Modifier.size(21.dp),
             )
@@ -153,7 +154,7 @@ fun VerifyButton(
 
 /** 오류 글자색 — 다크 모드에서는 밝은 산호빛으로 바꾼다 (SetupScreen ErrorBox와 같은 값) */
 @Composable
-fun errorTone(): Color = if (isSystemInDarkTheme()) Color(0xFFFF9DA6) else WebError
+fun errorTone(): Color = if (isAppDark()) Color(0xFFFF9DA6) else WebError
 
 /** 웹 `.field-hint` — 입력칸 아래 안내. 오류면 빨강, 통과면 민트 */
 @Composable

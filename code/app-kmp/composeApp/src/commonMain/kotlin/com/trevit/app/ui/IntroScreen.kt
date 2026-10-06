@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.sp
 import com.trevit.app.AppState
 import com.trevit.app.resources.*
 import com.trevit.app.Screen
+import com.trevit.app.i18n.tr
 import kotlinx.coroutines.delay
 
 // 웹 `.intro-*` 애니메이션 타이밍 (style.css @keyframes introIn + setup.js)
@@ -106,7 +107,7 @@ fun IntroScreen(state: AppState) {
             // 웹 `.intro-symbol { width: 132px }` — 원본 비율 94:58
             Icon(
                 painter = painterResource(Res.drawable.ic_travit_symbol),
-                contentDescription = "트레빗",
+                contentDescription = tr("auth.brand"),
                 tint = BrandMint,
                 modifier = Modifier
                     .width(132.dp)
@@ -126,7 +127,7 @@ fun IntroScreen(state: AppState) {
             )
             // 웹 `.intro-tagline { font-size: 13.5px; color: mono-500 }`
             Text(
-                "AI가 여행 계획을 대신 세워드려요",
+                tr("auth.intro.tagline"),
                 fontSize = 13.5.sp,
                 color = webTextFaint(),
                 textAlign = TextAlign.Center,
@@ -137,4 +138,4 @@ fun IntroScreen(state: AppState) {
 }
 
 @Composable
-private fun isDarkIntro(): Boolean = androidx.compose.foundation.isSystemInDarkTheme()
+private fun isDarkIntro(): Boolean = isAppDark()
