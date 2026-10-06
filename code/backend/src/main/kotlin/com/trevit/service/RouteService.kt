@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service
 import org.springframework.web.client.RestClient
 import java.net.URI
 import java.net.URLEncoder
+import java.time.LocalDateTime
 import java.nio.charset.StandardCharsets
 import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
@@ -66,6 +67,30 @@ class RouteService(
     }
 
     // ---------- 도보 ----------
+
+    /**
+     * 버스 구간 대기 시간(분).
+     * - 곧(REALTIME_WINDOW_MIN 분 안에) 출발하는 구간: 승차 정류장의 실시간 도착정보
+     * - 그 뒤 구간: 그 노선의 배차 간격(요일별)의 절반 = 평균 대기
+     * - 버스 번호·정류장·API 정보가 없으면(지하철·도보·TAGO 미지원 지역) 기본값
+     */
+    fun busWaitMinutes(leg: LegDto, departAt: LocalDateTime, now: LocalDateTime): Int {
+        if (leg.mode != "TRANSIT") return 0
+        val lat = leg.boardLat
+        val lng = leg.boardLng
+        val busNo = firstBusNo(leg)
+        if (lat == null || lng == null || busNo == null) return DEFAULT_BUS_WAIT_MIN
+        val soon = !departAt.isBefore(now.minusMinutes(5)) && !departAt.isAfter(now.plusMinutes(REALTIME_WINDOW_MIN))
+        if (soon) publicBusService.nextArrivalMinutes(lat, lng, busNo)?.let { return it.coerceIn(0, 60) }
+        publicBusService.headwayMinutes(lat, lng, busNo, departAt.dayOfWeek)?.let { return ((it + 1) / 2).coerceIn(1, 60) }
+        return DEFAULT_BUS_WAIT_MIN
+    }
+
+    /** 구간의 첫 버스 번호 (예: "472번 버스 …" → "472"). 지하철 구간이면 null */
+    private fun firstBusNo(leg: LegDto): String? {
+        val text = leg.steps?.firstOrNull { it.kind == "BUS" }?.description ?: leg.summary
+        return Regex("([0-9A-Za-z가-힣-]+)번").find(text)?.groupValues?.get(1)
+    }
 
     private fun fetchWalk(fromLat: Double, fromLng: Double, toLat: Double, toLng: Double): LegDto {
         // 1순위: TMAP 보행자 경로 (한국 보행로 데이터)
@@ -363,6 +388,8 @@ class RouteService(
     companion object {
         private const val WALK_SPEED_M_PER_MIN = 67.0   // 약 4km/h
         private const val BASE_BUS_FARE = 1500L         // 시내버스 성인 요금(카드) 추정
+        private const val DEFAULT_BUS_WAIT_MIN = 7      // 버스 대기 기본값 (API 정보가 없을 때)
+        private const val REALTIME_WINDOW_MIN = 30L     // 이 안에 출발하는 구간은 실시간 도착정보를 쓴다
 
         /** 이 직선거리(m)를 넘는 이동은 시외로 보고 시외버스 정보를 결합한다 */
         private const val INTERCITY_THRESHOLD_M = 30_000.0

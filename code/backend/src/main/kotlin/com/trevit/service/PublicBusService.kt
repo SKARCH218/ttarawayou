@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service
 import org.springframework.web.client.RestClient
 import java.net.URI
 import java.net.URLEncoder
+import java.time.DayOfWeek
 import java.nio.charset.StandardCharsets
 import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
@@ -52,6 +53,7 @@ class PublicBusService(@Value("\${datago.api-key}") apiKey: String?) {
     /** "cityCode:busNo" → 노선 후보, routeId → 정류소 시퀀스, 좌표 → 근접 정류소 목록 */
     private val routeCache = ConcurrentHashMap<String, List<JsonNode>>()
     private val stationCache = ConcurrentHashMap<String, List<DoubleArray>>()
+    private val headwayCache = ConcurrentHashMap<String, Int>() // 0 = 조회했지만 모름
     private val nearCache = ConcurrentHashMap<String, List<Station>>()
 
     @Volatile
@@ -183,6 +185,44 @@ class PublicBusService(@Value("\${datago.api-key}") apiKey: String?) {
             handleFailure("도착정보 조회", e)
         }
         return st to out
+    }
+
+    /** 지금 그 정류장에 해당 버스가 오기까지 남은 분 (실시간 도착정보), 모르면 null */
+    fun nextArrivalMinutes(lat: Double, lng: Double, busNo: String): Int? =
+        arrivalsNear(lat, lng, busNo)?.second?.firstOrNull()?.let { (it.arrTimeSec + 59) / 60 }
+
+    /**
+     * 노선 배차 간격(분) — 요일에 맞는 값(평일/토요일/일요일·공휴일). 모르면 null.
+     * 노선·요일별로 캐시해 같은 버스를 여러 번 조회하지 않는다.
+     */
+    fun headwayMinutes(lat: Double, lng: Double, busNo: String, day: DayOfWeek): Int? {
+        if (!enabled()) return null
+        val st = nearestStation(lat, lng) ?: return null
+        val key = "${st.cityCode}:$busNo:${if (day == DayOfWeek.SATURDAY || day == DayOfWeek.SUNDAY) day else "WEEKDAY"}"
+        headwayCache[key]?.let { return it.takeIf { m -> m > 0 } }
+        val minutes = try {
+            val routeId = findRoutes(st.cityCode, busNo).firstOrNull()?.path("routeid")?.asText()
+            if (routeId.isNullOrBlank()) null else {
+                val info = asArray(call(
+                    "/BusRouteInfoInqireService/getRouteInfoIem",
+                    String.format(
+                        Locale.US, "&cityCode=%s&routeId=%s",
+                        st.cityCode, URLEncoder.encode(routeId, StandardCharsets.UTF_8),
+                    ),
+                )).firstOrNull()
+                val field = when (day) {
+                    DayOfWeek.SATURDAY -> "intervalsattime"
+                    DayOfWeek.SUNDAY -> "intervalsuntime"
+                    else -> "intervaltime"
+                }
+                info?.path(field)?.asInt(0)?.takeIf { it > 0 } ?: info?.path("intervaltime")?.asInt(0)
+            }
+        } catch (e: Exception) {
+            handleFailure("배차간격 조회", e)
+            null
+        }
+        headwayCache[key] = minutes ?: 0
+        return minutes?.takeIf { it > 0 }
     }
 
     // ---------- TAGO API 공통 ----------
