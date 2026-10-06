@@ -31,7 +31,10 @@ class TmapService(@Value("\${tmap.app-key}") appKey: String?) {
 
     data class WalkRoute(val path: List<DoubleArray>, val distanceMeters: Double, val minutes: Int)
 
-    data class Poi(val name: String, val lat: Double, val lng: Double, val address: String)
+    data class Poi(
+        val name: String, val lat: Double, val lng: Double, val address: String,
+        val category: String = "",
+    )
 
     private val appKey: String = appKey?.trim().orEmpty()
     private val mapper = ObjectMapper()
@@ -226,6 +229,37 @@ class TmapService(@Value("\${tmap.app-key}") appKey: String?) {
         } catch (e: Exception) {
             if (isQuotaError(e)) markQuotaExhausted("POI 검색($category)")
             else log.warn("TMAP POI 검색 실패({}): {}", category, e.message)
+        }
+        return out
+    }
+
+    /** 장소 이름으로 검색 (기준 좌표에서 가까운 순). "꼭 가고 싶은 곳" 찾기용 */
+    fun searchPois(keyword: String, lat: Double, lng: Double, count: Int): List<Poi> {
+        if (!usable()) return emptyList()
+        val out = ArrayList<Poi>()
+        try {
+            val url = String.format(
+                Locale.US,
+                "%s/tmap/pois?version=1&searchKeyword=%s&centerLon=%f&centerLat=%f&searchtypCd=R&page=1&count=%d",
+                BASE, URLEncoder.encode(keyword, StandardCharsets.UTF_8), lng, lat, minOf(20, count),
+            )
+            val res = http.get().uri(URI.create(url))
+                .header("appKey", appKey).retrieve().body(String::class.java)
+            if (res.isNullOrBlank()) return out   // 결과 없음은 빈 본문(204)으로 온다
+            val pois = mapper.readTree(res).path("searchPoiInfo").path("pois").path("poi")
+            for (p in pois) {
+                val la = p.path("frontLat").asDouble(p.path("noorLat").asDouble(0.0))
+                val lo = p.path("frontLon").asDouble(p.path("noorLon").asDouble(0.0))
+                if (la == 0.0 || lo == 0.0) continue
+                val addr = (p.path("upperAddrName").asText("") + " " +
+                    p.path("middleAddrName").asText("") + " " +
+                    p.path("lowerAddrName").asText("")).trim()
+                val category = p.path("upperBizName").asText("") + " " + p.path("middleBizName").asText("")
+                out.add(Poi(p.path("name").asText(""), la, lo, addr, category.trim()))
+            }
+        } catch (e: Exception) {
+            if (isQuotaError(e)) markQuotaExhausted("장소 이름 검색")
+            else log.warn("TMAP 장소 이름 검색 실패({}): {}", keyword, e.message)
         }
         return out
     }

@@ -11,6 +11,7 @@ import com.trevit.entity.Place
 import com.trevit.entity.Place.PlaceType
 import com.trevit.entity.Wallet
 import com.trevit.repository.WalletRepository
+import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import java.time.LocalTime
 import java.time.ZoneId
@@ -34,6 +35,8 @@ class PlanService(
     private val placeProvider: PlaceProviderService,
     private val regionService: RegionService,
 ) {
+
+    private val log = LoggerFactory.getLogger(PlanService::class.java)
 
     fun createPlan(req: PlanRequest): PlanResponse {
         val days = req.days.coerceIn(1, 7)
@@ -62,14 +65,25 @@ class PlanService(
         val region = regionService.resolve(req.region)
         val userInArea = req.startLatitude != null && req.startLongitude != null &&
             regionService.inServiceArea(req.startLatitude, req.startLongitude)
-        val anchorLat = region?.lat ?: if (userInArea) req.startLatitude!! else regionService.default.lat
-        val anchorLng = region?.lng ?: if (userInArea) req.startLongitude!! else regionService.default.lng
+        // 고른 지역 안에 있으면(지역 중심 15km 이내) 내 위치를 기준으로 장소를 찾는다 — 홍대에 있으면 홍대 주변부터
+        val userInRegion = userInArea && region != null &&
+            GeoUtil.distanceMeters(region.lat, region.lng, req.startLatitude!!, req.startLongitude!!) <= NEAR_REGION_M
+        val anchorLat = if (userInRegion) req.startLatitude!!
+            else region?.lat ?: if (userInArea) req.startLatitude!! else regionService.default.lat
+        val anchorLng = if (userInRegion) req.startLongitude!!
+            else region?.lng ?: if (userInArea) req.startLongitude!! else regionService.default.lng
         val regionName = region?.name ?: if (userInArea) "현재 위치" else regionService.default.name
 
         // 장소 후보: TMAP POI 실시간 조회 → 키 없음/429/부족 시 수도권 시드 폴백
         val rawPool = placeProvider.places(anchorLat, anchorLng)
         // 프로필·취향 반영: 걷기 기피 시 산·등산 장소 제외, 선호 키워드·음식 취향 가점
         val pool = applyPreferences(rawPool, req)
+
+        // 꼭 가고 싶은 곳 — 이름으로 실제 장소를 찾는다 (걷기 기피로 걸러지기 전 원본에서, 최대 5곳)
+        val mustNames = req.mustVisit.orEmpty().map { it.trim() }.filter { it.isNotEmpty() }.distinct().take(5)
+        val mustFound = mustNames.associateWith { placeProvider.findByName(it, anchorLat, anchorLng, rawPool) }
+        val mustPlaces = mustFound.values.filterNotNull().distinctBy { it.id }
+        val mustMissing = mustFound.filterValues { it == null }.keys.toList()
 
         // ---------- 1차: 로컬 AI(LM Studio)에게 프로필과 함께 플랜 요청 ----------
         val profile = PlanDtos.TravelProfile(
@@ -82,9 +96,28 @@ class PlanService(
             avoidWalking = req.avoidWalking,
             keywords = req.keywords.orEmpty(),
             preferenceNote = req.preferenceNote,
+            mustVisit = mustPlaces,
         )
-        val aiCatalog = if (dayTrip) pool.all().filter { it.type != PlaceType.LODGING } else pool.all()
-        val ai = aiPlanService.plan(budget, days, people, nights, aiCatalog, profile)
+        // ---------- 동선 최적화: 하루 = 동네 하나 ----------
+        // 날마다 볼거리·맛집이 모인 동네 중심(허브)을 정하고, 그날 장소는 그 동네 안에서만 고른다.
+        // 1일차는 현재 위치 근처 동네를, 꼭 가고 싶은 곳이 있으면 그곳을 동네로 삼는다.
+        val start = if (userInArea) req.startLatitude!! to req.startLongitude!! else null
+        val hubs = pickDayHubs(pool, days, mustPlaces, start, anchorLat to anchorLng)
+        val zones = buildDayZones(pool, hubs)
+        val zoneOf = HashMap<Long, Int>()
+        zones.forEachIndexed { d, z -> (z.attractions + z.restaurants).forEach { p -> p.id?.let { zoneOf[it] = d + 1 } } }
+        val hubCenter = hubs.map { it.first }.average() to hubs.map { it.second }.average()
+        val mustIds = mustPlaces.mapNotNull { it.id }.toSet()
+
+        val aiCatalog = ((if (dayTrip) emptyList() else nearbyLodgings(pool.lodgings, hubCenter)) +
+            zones.flatMap { it.attractions + it.restaurants } + mustPlaces).distinctBy { it.id }
+        var ai = aiPlanService.plan(budget, days, people, nights, aiCatalog, profile, zoneOf)
+        if (ai != null && !ai.days.withIndex().all { (d, list) ->
+                list.all { it.id in mustIds || zoneOf[it.id] == d + 1 }
+            }) {
+            log.warn("AI 플랜이 하루 한 동네 규칙을 어김 → 휴리스틱 폴백")
+            ai = null
+        }
 
         val lodging: Place?              // 당일치기면 null
         val perDay: List<List<Place>>    // 일자별 장소 (AI면 방문 순서 그대로, 휴리스틱이면 미정렬)
@@ -98,9 +131,7 @@ class PlanService(
             plannedBy = "AI"
         } else {
             // ---------- 폴백: 휴리스틱 ----------
-            lodging = if (dayTrip) null else pickLodging(pool.lodgings, nights, lodgingBudget)
-            val cLat = lodging?.latitude ?: anchorLat
-            val cLng = lodging?.longitude ?: anchorLng
+            lodging = if (dayTrip) null else pickLodging(nearbyLodgings(pool.lodgings, hubCenter), nights, lodgingBudget)
 
             // 이 지역 최저가 숙소마저 숙박 예산을 넘으면(예: 성수기 리조트 지역),
             // 초과분을 관광·식비 예산에서 비례 차감해 총액이 예산을 넘지 않게 한다.
@@ -110,16 +141,16 @@ class PlanService(
             val attractionBudgetAdj = maxOf(0, attractionBudget - attractionCut)
             val foodBudgetAdj = maxOf(0, foodBudget - (cut - attractionCut))
 
-            val attractions = pickPlaces(pool.attractions, cLat, cLng, attractionBudgetAdj, people, days * 3)
-            val restaurants = pickPlaces(pool.restaurants, cLat, cLng, foodBudgetAdj, people, days * 3)
-
-            val attractionsByDay = splitByDay(nearestNeighborOrder(cLat, cLng, attractions), days)
-            val restaurantsByDay = assignRestaurants(restaurants, attractionsByDay, cLat, cLng, days)
-            perDay = (0 until days).map { d -> attractionsByDay[d] + restaurantsByDay[d] }
+            // 그날 동네 안에서만 관광지 3곳 + 식당 3곳 (예산은 날짜별로 나눈다)
+            perDay = zones.map { z ->
+                pickPlaces(z.attractions, z.lat, z.lng, attractionBudgetAdj / days, people, 3) +
+                    pickPlaces(z.restaurants, z.lat, z.lng, foodBudgetAdj / days, people, 3)
+            }
             aiOrdered = false
             plannedBy = "ALGORITHM"
         }
 
+        val mustByDay = assignMustVisit(perDay, mustPlaces, days)
         val lodgingSpent = lodging?.let { it.price.toLong() * nights } ?: 0L
 
         // 일자별 출발 시각: 1일차는 현재 시각(밤·새벽이면 09:00), 이후 날은 09:00
@@ -139,7 +170,10 @@ class PlanService(
         val usedPerDay = ArrayList<List<Place>>() // 실제 일정에 들어간 장소(식사 슬롯 반영)
         var transportSpent = 0L
         for (d in 0 until days) {
-            val dayPlaces = perDay[d]
+            val dayMust = mustByDay[d]
+            // 휴리스틱은 하루 장소를 받아 스스로 순서를 짜므로 미리 넣어 두고, AI 순서는 아래에서 끼워 넣는다
+            val dayPlaces = if (aiOrdered) perDay[d]
+                else perDay[d] + dayMust.filter { m -> perDay[d].none { it.id == m.id } }
 
             // 출발점: 1일차는 사용자 현재 위치(있으면), 그 외/폴백은 숙소.
             val fromUserLocation = d == 0 && req.startLatitude != null && req.startLongitude != null
@@ -165,11 +199,15 @@ class PlanService(
             }
 
             // 식사는 08/12/17시 슬롯 근처에만 배치하고, 이미 지난 슬롯의 끼니는 생략한다.
-            val ordered = if (aiOrdered) {
-                trimMealsToSlots(fixConsecutiveMeals(ArrayList(dayPlaces)), dayStarts[d])
-            } else {
-                buildDaySequenceTimed(startLat, startLng, dayPlaces, dayStarts[d])
-            }
+            // 끼니 정리로 꼭 가고 싶은 곳이 빠졌으면 다시 넣는다
+            val ordered = ensureIncluded(
+                if (aiOrdered) {
+                    trimMealsToSlots(fixConsecutiveMeals(ArrayList(dayPlaces)), dayStarts[d])
+                } else {
+                    buildDaySequenceTimed(startLat, startLng, dayPlaces, dayStarts[d])
+                },
+                dayMust,
+            )
             usedPerDay.add(ordered)
 
             val stops = ArrayList<StopDto>()
@@ -258,7 +296,10 @@ class PlanService(
         return PlanResponse(
             budget, days, people, totalCost,
             budget - totalCost, breakdown, dayPlans, plannedBy, wallet.balance,
-            aiReason = ai?.reason ?: describePlan(req, regionName, days, usedPerDay),
+            aiReason = listOfNotNull(
+                ai?.reason ?: describePlan(req, regionName, days, usedPerDay),
+                mustVisitNote(mustPlaces, mustMissing),
+            ).joinToString(" "),
         )
     }
 
@@ -280,13 +321,19 @@ class PlanService(
         var bonus = 0.0
         req.keywords?.forEach { if (text.contains(it)) bonus += 0.5 }
         if (p.type == PlaceType.RESTAURANT) {
-            when (req.foodPreference) {
-                "한식" -> if (Regex("한식|국밥|백반|한정식|칼국수|비빔|삼겹|갈비|해물|찌개|분식|족발|보쌈|막국수")
-                        .containsMatchIn(text)) bonus += 0.6
-                "양식" -> if (Regex("파스타|스테이크|피자|브런치|버거|이탈리|프렌치").containsMatchIn(text)) bonus += 0.6
-                "일식" -> if (Regex("일식|스시|초밥|라멘|돈카츠|우동|이자카야").containsMatchIn(text)) bonus += 0.6
-                "중식" -> if (Regex("중식|짜장|짬뽕|중화|탕수육|마라").containsMatchIn(text)) bonus += 0.6
+            // 음식 취향은 여러 개 고를 수 있다 — 하나라도 맞으면 가점
+            val matched = PlanDtos.splitChoices(req.foodPreference).any { food ->
+                when (food) {
+                    "한식" -> Regex("한식|국밥|백반|한정식|칼국수|비빔|삼겹|갈비|해물|찌개|분식|족발|보쌈|막국수")
+                        .containsMatchIn(text)
+                    "양식" -> Regex("파스타|스테이크|피자|브런치|버거|이탈리|프렌치").containsMatchIn(text)
+                    "일식" -> Regex("일식|스시|초밥|라멘|돈카츠|우동|이자카야").containsMatchIn(text)
+                    "중식" -> Regex("중식|짜장|짬뽕|중화|탕수육|마라").containsMatchIn(text)
+                    "상관없음" -> false
+                    else -> food.length >= 2 && text.contains(food)  // 직접 입력한 음식
+                }
             }
+            if (matched) bonus += 0.6
         }
         // 자연어 취향 메모: 2글자 이상 단어가 장소 정보에 나타나면 가점
         req.preferenceNote?.split(Regex("[,·\\s]+"))?.forEach { w ->
@@ -337,6 +384,44 @@ class PlanService(
     }
 
     /** 휴리스틱 플랜에 대한 규칙 기반 설명 (AI가 이유를 못 준 경우 사용) */
+    /** 꼭 가고 싶은 곳을 일자에 배정 — 플래너가 이미 넣은 날이 있으면 그날, 없으면 그날 장소들과 가장 가까운 날 */
+    private fun assignMustVisit(perDay: List<List<Place>>, must: List<Place>, days: Int): List<List<Place>> {
+        val out = List(days) { ArrayList<Place>() }
+        for (m in must) {
+            val already = perDay.indexOfFirst { day -> day.any { it.id == m.id } }
+            val d = if (already >= 0) already else (0 until days).minByOrNull { day ->
+                perDay.getOrNull(day).orEmpty().minOfOrNull {
+                    GeoUtil.distanceMeters(it.latitude, it.longitude, m.latitude, m.longitude)
+                } ?: Double.MAX_VALUE
+            } ?: 0
+            out[d].add(m)
+        }
+        return out
+    }
+
+    /** 빠진 꼭 가고 싶은 곳을 그날 동선에서 가장 가까운 장소 바로 뒤에 끼워 넣는다 */
+    private fun ensureIncluded(seq: List<Place>, must: List<Place>): List<Place> {
+        if (must.isEmpty()) return seq
+        val out = ArrayList(seq)
+        for (m in must) {
+            if (out.any { it.id == m.id }) continue
+            val nearest = out.indices.minByOrNull {
+                GeoUtil.distanceMeters(out[it].latitude, out[it].longitude, m.latitude, m.longitude)
+            }
+            if (nearest == null) out.add(m) else out.add(nearest + 1, m)
+        }
+        return out
+    }
+
+    private fun mustVisitNote(found: List<Place>, missing: List<String>): String? {
+        val parts = ArrayList<String>()
+        if (found.isNotEmpty()) parts += "꼭 가고 싶다고 하신 곳 ${found.size}곳을 일정에 넣었어요."
+        if (missing.isNotEmpty()) {
+            parts += "${missing.joinToString(", ") { "'$it'" }}은(는) 이 지역에서 찾지 못해 넣지 못했어요."
+        }
+        return parts.takeIf { it.isNotEmpty() }?.joinToString(" ")
+    }
+
     private fun describePlan(
         req: PlanRequest, regionName: String, days: Int, usedPerDay: List<List<Place>>,
     ): String {
@@ -370,7 +455,8 @@ class PlanService(
         val scored = candidates
             .map { p ->
                 val distKm = GeoUtil.distanceMeters(centerLat, centerLng, p.latitude, p.longitude) / 1000.0
-                p to (p.rating * 2.0 - minOf(distKm, 40.0) * 0.22)
+                // 동네 안에서도 가까운 곳 우선 — 평점 0.5점 차이가 거리 1km와 맞먹는다
+                p to (p.rating * 2.0 - minOf(distKm, 40.0) * 1.0)
             }
             .sortedByDescending { it.second }
             .map { it.first }
@@ -417,48 +503,93 @@ class PlanService(
         return chosen
     }
 
-    /** 체인을 일수만큼 연속 구간으로 분할 (하루 2~3곳 균등 배분) */
-    private fun splitByDay(chain: List<Place>, days: Int): List<MutableList<Place>> {
-        val byDay = ArrayList<MutableList<Place>>()
-        val total = chain.size
-        val base = total / days
-        val extra = total % days
-        var idx = 0
-        for (d in 0 until days) {
-            val size = base + (if (d < extra) 1 else 0)
-            byDay.add(ArrayList(chain.subList(idx, minOf(idx + size, total))))
-            idx += size
+    /** 하루 동선이 머무는 동네 — 중심 좌표와 그 안의 관광지·식당 후보 */
+    private data class DayZone(
+        val lat: Double, val lng: Double,
+        val attractions: List<Place>, val restaurants: List<Place>,
+    )
+
+    private fun dist(lat: Double, lng: Double, p: Place) =
+        GeoUtil.distanceMeters(lat, lng, p.latitude, p.longitude)
+
+    /**
+     * 날짜별 동네 중심(허브)을 고른다.
+     * 1) 꼭 가고 싶은 곳은 그 자체가 그날의 동네 (서로 가까우면 같은 날)
+     * 2) 나머지 날은 반경 안에 볼거리·맛집이 많이 모인 곳, 날마다 다른 동네가 되도록 서로 떨어뜨린다
+     * 마지막으로 현재 위치(없으면 기준점)에서 가까운 순으로 날짜를 매긴다 — 1일차는 내 근처 동네.
+     */
+    private fun pickDayHubs(
+        pool: PlaceProviderService.Pool, days: Int, must: List<Place>,
+        start: Pair<Double, Double>?, anchor: Pair<Double, Double>,
+    ): List<Pair<Double, Double>> {
+        val spots = pool.attractions + pool.restaurants
+        fun density(c: Place): Double {
+            val near = spots.filter { dist(c.latitude, c.longitude, it) <= HUB_RADIUS_M }
+            val a = near.count { it.type == PlaceType.ATTRACTION }
+            val r = near.count { it.type == PlaceType.RESTAURANT }
+            val balanced = if (a >= 2 && r >= 2) 3.0 else 0.0
+            return minOf(a, 6) + minOf(r, 6) * 0.8 + balanced + c.rating * 0.3
         }
-        return byDay
+        val hubs = ArrayList<Pair<Double, Double>>()
+        fun apart(lat: Double, lng: Double, gap: Double) =
+            hubs.all { GeoUtil.distanceMeters(it.first, it.second, lat, lng) >= gap }
+
+        for (m in must) {
+            if (hubs.size >= days) break
+            if (apart(m.latitude, m.longitude, HUB_RADIUS_M * 2)) hubs.add(m.latitude to m.longitude)
+        }
+        val origin = start ?: anchor
+        val candidates = pool.attractions.map { it to density(it) }
+        while (hubs.size < days) {
+            // 1일차 후보는 현재 위치에서 멀수록 감점 (km당 1.5점)
+            val nearStart = hubs.isEmpty() && start != null
+            val pick = (candidates.filter { (p, _) -> apart(p.latitude, p.longitude, HUB_MIN_GAP_M) }
+                .ifEmpty { candidates.filter { (p, _) -> apart(p.latitude, p.longitude, HUB_RADIUS_M) } })
+                .maxByOrNull { (p, score) ->
+                    if (nearStart) score - dist(origin.first, origin.second, p) / 1000.0 * 1.5 else score
+                } ?: break
+            hubs.add(pick.first.latitude to pick.first.longitude)
+        }
+        while (hubs.size < days) hubs.add(hubs.lastOrNull() ?: anchor)
+
+        // 현재 위치에서 시작해 가까운 동네부터 차례로 (최근접 이웃)
+        val ordered = ArrayList<Pair<Double, Double>>()
+        val left = ArrayList(hubs)
+        var cur = origin
+        while (left.isNotEmpty()) {
+            val next = left.minByOrNull { GeoUtil.distanceMeters(cur.first, cur.second, it.first, it.second) }!!
+            left.remove(next)
+            ordered.add(next)
+            cur = next
+        }
+        return ordered
     }
 
-    /** 각 날짜의 관광지 중심에 가까운 식당을 3곳씩 배정 */
-    private fun assignRestaurants(
-        restaurants: List<Place>,
-        attractionsByDay: List<List<Place>>,
-        baseLat: Double, baseLng: Double, days: Int,
-    ): List<List<Place>> {
-        val pool = ArrayList(restaurants)
-        val byDay = ArrayList<List<Place>>()
-        for (d in 0 until days) {
-            val dayAttractions = attractionsByDay[d]
-            val cLat: Double
-            val cLng: Double
-            if (dayAttractions.isEmpty()) {
-                cLat = baseLat
-                cLng = baseLng
-            } else {
-                cLat = dayAttractions.map { it.latitude }.average()
-                cLng = dayAttractions.map { it.longitude }.average()
+    /**
+     * 동네마다 반경 안의 관광지·식당 후보를 모은다. 후보가 3곳씩 안 되면 반경을 조금씩 넓힌다.
+     * 같은 장소가 두 날에 들어가지 않도록 앞선 날이 쓴 장소는 제외한다.
+     */
+    private fun buildDayZones(pool: PlaceProviderService.Pool, hubs: List<Pair<Double, Double>>): List<DayZone> {
+        val used = HashSet<Long>()
+        return hubs.map { (lat, lng) ->
+            var attractions = emptyList<Place>()
+            var restaurants = emptyList<Place>()
+            for (radius in ZONE_RADII_M) {
+                attractions = pool.attractions.filter { it.id !in used && dist(lat, lng, it) <= radius }
+                restaurants = pool.restaurants.filter { it.id !in used && dist(lat, lng, it) <= radius }
+                if (attractions.size >= 3 && restaurants.size >= 3) break
             }
-            val picked = pool
-                .sortedBy { GeoUtil.distanceMeters(cLat, cLng, it.latitude, it.longitude) }
-                .take(3)
-            pool.removeAll(picked)
-            byDay.add(picked)
+            fun top(list: List<Place>) =
+                list.sortedByDescending { it.rating - dist(lat, lng, it) / 1000.0 }.take(ZONE_CANDIDATES)
+            val zone = DayZone(lat, lng, top(attractions), top(restaurants))
+            (zone.attractions + zone.restaurants).forEach { p -> p.id?.let(used::add) }
+            zone
         }
-        return byDay
     }
+
+    /** 동네들 가까이의 숙소만 후보로 (멀리 있는 비싼 숙소 때문에 매일 먼 길을 오가지 않게) */
+    private fun nearbyLodgings(lodgings: List<Place>, center: Pair<Double, Double>): List<Place> =
+        lodgings.sortedBy { dist(center.first, center.second, it) }.take(NEARBY_LODGINGS)
 
     /** 출발 시각 기준으로 아직 챙길 수 있는 식사 슬롯 (1시간 이상 지난 슬롯은 생략) */
     private fun mealSlots(dayStart: LocalTime): MutableList<LocalTime> =
@@ -572,6 +703,14 @@ class PlanService(
     companion object {
         // 직선 800m 이하만 도보 (도로를 따라 걸으면 대략 1km 이내가 되도록) — 그 이상은 대중교통
         private const val WALK_THRESHOLD_M = 800.0
+
+        // 하루 동선 = 동네 하나: 허브 반경, 날마다 다른 동네가 되도록 허브 간 최소 거리
+        private const val HUB_RADIUS_M = 1500.0
+        private const val HUB_MIN_GAP_M = 3000.0
+        private val ZONE_RADII_M = listOf(1500.0, 2500.0, 4000.0) // 후보가 모자라면 넓혀 본다
+        private const val ZONE_CANDIDATES = 12   // 동네당 관광지·식당 후보 수 (AI 프롬프트 길이도 줄인다)
+        private const val NEARBY_LODGINGS = 8
+        private const val NEAR_REGION_M = 15_000.0  // 이 안이면 "그 지역에 와 있다"고 본다
         private val HHMM = DateTimeFormatter.ofPattern("HH:mm")
         private const val MEAL_MIN = 50          // 식사 시간
         private const val ATTRACTION_MIN = 60    // 관광지 이용 시간

@@ -45,13 +45,17 @@ class AiPlanService(
         })
         .build()
 
+    /**
+     * [zones] 장소 id → 권역 번호(=일차). 하루는 한 동네 안에서만 움직이도록 AI에게 알려준다.
+     */
     fun plan(
         budget: Long, days: Int, people: Int, nights: Int, places: List<Place>,
         profile: PlanDtos.TravelProfile = PlanDtos.TravelProfile(),
+        zones: Map<Long, Int> = emptyMap(),
     ): AiSelection? {
         if (!enabled) return null
         return try {
-            val content = chat(buildPrompt(budget, days, people, nights, places, profile))
+            val content = chat(buildPrompt(budget, days, people, nights, places, profile, zones))
             val sel = parse(content, days, places, nights > 0)
             if (sel == null) {
                 log.warn("AI 응답 파싱/검증 실패 → 휴리스틱 폴백")
@@ -80,6 +84,7 @@ class AiPlanService(
     private fun buildPrompt(
         budget: Long, days: Int, people: Int, nights: Int, places: List<Place>,
         profile: PlanDtos.TravelProfile,
+        zones: Map<Long, Int>,
     ): String {
         val dayTrip = nights <= 0
         val sb = StringBuilder()
@@ -102,7 +107,11 @@ class AiPlanService(
             .append("- 매일 관광지 2~3곳 + 식당 최대 3곳. 입장료와 식비는 ")
             .append(people).append("명 몫으로 계산된다\n")
             .append("- 같은 날의 장소들은 서로 가까운 곳으로 묶고, stopIds는 이동 동선이 자연스러운 방문 순서로 나열하라\n")
-            .append("- 식당과 관광지를 번갈아 배치하라 (아침식사로 시작하면 자연스럽다). ")
+        if (zones.isNotEmpty()) {
+            sb.append("- 동선 규칙(필수): N일차 stopIds에는 권역이 N인 장소만 넣어라. 하루는 한 동네 안에서 걸어 다니며 먹고 노는 일정이다. ")
+                .append("권역이 '-'인 숙소는 lodgingId로만 써라 (단, 꼭 가고 싶은 곳은 권역과 관계없이 넣는다)\n")
+        }
+        sb.append("- 식당과 관광지를 번갈아 배치하라 (아침식사로 시작하면 자연스럽다). ")
             .append("식당 두 곳을 연속으로 배치하는 것은 절대 금지\n")
             .append("- 같은 장소를 두 번 넣지 마라\n")
             .append("- 중요: 예산을 최대한 다 써라. 장소 비용 합계(숙박+입장료x인원+식비x인원)가 ")
@@ -112,7 +121,8 @@ class AiPlanService(
             .append("{\"lodgingId\": 숫자, \"days\": [{\"stopIds\": [숫자, ...]}")
         sb.append(", ...], \"reason\": \"이 여행자 프로필에 맞춰 왜 이렇게 계획했는지 한국어 1~3문장\"}")
             .append("  (days 배열 길이는 정확히 ").append(days).append(")\n\n")
-        sb.append("장소 목록 (id|종류|이름|1인가격원|평점|위도|경도):\n")
+        sb.append(if (zones.isEmpty()) "장소 목록 (id|종류|이름|1인가격원|평점|위도|경도):\n"
+            else "장소 목록 (id|종류|이름|1인가격원|평점|위도|경도|권역):\n")
         for (p in places) {
             sb.append(p.id).append('|')
                 .append(when (p.type) {
@@ -124,7 +134,9 @@ class AiPlanService(
                 .append(p.price).append('|')
                 .append(p.rating).append('|')
                 .append(String.format(Locale.US, "%.4f", p.latitude)).append('|')
-                .append(String.format(Locale.US, "%.4f", p.longitude)).append('\n')
+                .append(String.format(Locale.US, "%.4f", p.longitude))
+            if (zones.isNotEmpty()) sb.append('|').append(zones[p.id]?.toString() ?: "-")
+            sb.append('\n')
         }
         return sb.toString()
     }
@@ -144,17 +156,30 @@ class AiPlanService(
             else "외향형이니 활기찬 명소·시장·체험 위주")
             sb.append(")\n")
         }
-        p.purpose?.let {
-            sb.append("- 여행 목적: ").append(it).append(" — ")
-            sb.append(when (it) {
-                "휴양" -> "온천·해변·공원 등 쉬어가는 일정으로, 이동을 느슨하게"
-                "미식" -> "평점 좋은 식당에 예산과 동선의 우선순위를 두라"
-                "액티비티" -> "체험·테마파크·야외 활동 위주로"
-                else -> "대표 관광 명소 위주로"
-            }).append('\n')
+        val purposes = PlanDtos.splitChoices(p.purpose)
+        if (purposes.isNotEmpty()) {
+            sb.append("- 여행 목적: ").append(purposes.joinToString(", ")).append(" — ")
+            sb.append(purposes.joinToString(" / ") {
+                when (it) {
+                    "휴양" -> "온천·해변·공원 등 쉬어가는 일정으로, 이동을 느슨하게"
+                    "미식" -> "평점 좋은 식당에 예산과 동선의 우선순위를 두라"
+                    "액티비티" -> "체험·테마파크·야외 활동 위주로"
+                    "관광" -> "대표 관광 명소 위주로"
+                    else -> "'$it' 성격에 맞는 장소 위주로"
+                }
+            })
+            if (purposes.size > 1) sb.append(" (여러 목적을 골고루 섞어라)")
+            sb.append('\n')
         }
-        p.foodPreference?.takeIf { it != "상관없음" }?.let {
-            sb.append("- 음식 취향: ").append(it).append(" — 식당은 가능한 한 ").append(it).append(" 위주로 골라라\n")
+        val foods = PlanDtos.splitChoices(p.foodPreference).filter { it != "상관없음" }
+        if (foods.isNotEmpty()) {
+            val f = foods.joinToString(", ")
+            sb.append("- 음식 취향: ").append(f).append(" — 식당은 가능한 한 ").append(f).append(" 위주로 골라라\n")
+        }
+        if (p.mustVisit.isNotEmpty()) {
+            sb.append("- 꼭 가고 싶은 곳 (반드시 일정의 stopIds에 포함하라): ")
+            sb.append(p.mustVisit.joinToString(", ") { "id ${it.id} '${it.name.replace('\'', ' ')}'" })
+            sb.append('\n')
         }
         if (p.avoidWalking) {
             sb.append("- 걷기 기피: 산·등산·트레킹·긴 산책로 장소는 절대 넣지 말고, 서로 가까운 장소로 묶어 이동을 최소화하라. 하루 방문지도 적게 잡아라\n")
