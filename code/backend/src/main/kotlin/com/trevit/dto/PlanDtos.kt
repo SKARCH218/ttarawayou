@@ -115,6 +115,8 @@ object PlanDtos {
         val alightLng: Double? = null,
         val stations: List<DoubleArray>? = null, // 승차→하차 경유 정류장 좌표
         val steps: List<StepDto>? = null,        // 세부 단계, 없으면 null
+        // 경로 API를 못 써서(쿼터 초과 등) 거리로 추정한 구간 — 버스 번호·정류장 정보가 없다
+        val estimated: Boolean = false,
     ) {
         /** 일정표 시각을 채운 사본 */
         fun withTimes(depart: String, arrive: String): LegDto =

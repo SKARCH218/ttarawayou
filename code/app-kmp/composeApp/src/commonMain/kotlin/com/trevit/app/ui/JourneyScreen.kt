@@ -74,6 +74,8 @@ import com.trevit.app.map.LegGeometry
 import com.trevit.app.map.MapCamera
 import com.trevit.app.map.TILE_SIZE
 import com.trevit.app.map.TileKey
+import com.trevit.app.map.TransitGuide
+import com.trevit.app.map.TransitPhase
 import com.trevit.app.map.haversineMeters
 import com.trevit.app.map.locationUpdates
 import com.trevit.app.map.stopEmoji
@@ -194,34 +196,16 @@ fun JourneyScreen(state: AppState, dayIndex: Int) {
         .toInt().coerceAtLeast(if (remainMeters > 30) 1 else 0)
     val nextStop = stops.getOrNull(legIndex + 1)
 
-    // 대중교통 구간은 지하철/버스 세부 단계로 쪼개져 있다.
-    // 전체 환승 경로를 한꺼번에 보여주지 않고, 현재 위치가 속한 "타는 구간" 하나만 안내한다.
-    val transitSegments = if (currentLeg.mode == "TRANSIT") {
-        currentLeg.steps.orEmpty().filter { it.kind == "BUS" && !it.description.isNullOrBlank() }
-    } else emptyList()
-    // "버스 위치"(구간 거리 누적) 공간에서의 현재 위치
-    val transitTotalDist = transitSegments.sumOf { it.distanceMeters }.coerceAtLeast(1.0)
-    val transitTargetDist = (distOnLeg / currentGeom.lengthMeters).coerceIn(0.0, 1.0) * transitTotalDist
-    val currentSegIndex = if (transitSegments.isNotEmpty()) {
-        var acc = 0.0
-        var idx = transitSegments.lastIndex
-        for (i in transitSegments.indices) {
-            acc += transitSegments[i].distanceMeters
-            if (transitTargetDist <= acc + 1e-6) { idx = i; break }
-        }
-        idx
-    } else -1
-
-    // 현재 타는 구간에서 하차까지 남은 정거장 수 (설명의 "N개 정류장" + 구간 내 진행률로 추정)
-    val remainingStops = if (currentSegIndex >= 0) {
-        val seg = transitSegments[currentSegIndex]
-        val startOfCur = transitSegments.take(currentSegIndex).sumOf { it.distanceMeters }
-        val segDist = seg.distanceMeters.coerceAtLeast(1.0)
-        val progress = ((transitTargetDist - startOfCur) / segDist).coerceIn(0.0, 1.0)
-        val totalStops = Regex("(\\d+)개 정류장").find(seg.description ?: "")
-            ?.groupValues?.getOrNull(1)?.toIntOrNull() ?: 0
-        if (totalStops > 0) ceil(totalStops * (1.0 - progress)).toInt().coerceAtLeast(0) else -1
-    } else -1
+    // 대중교통 구간: 지금 정류장으로 걷는 중인지, 타고 가는 중인지, 내려서 걷는 중인지.
+    // 버스 번호·하차 정류장은 승차 정류장에 도착해야 보여 준다 (그 전엔 정류장 이름만).
+    val transitGuide = remember(dayIndex, legIndex) {
+        if (currentLeg.mode == "TRANSIT") TransitGuide(currentGeom) else null
+    }
+    val transitPhase = transitGuide?.phaseAt(distOnLeg)
+    val riding = transitPhase as? TransitPhase.Riding
+    val currentSegIndex = riding?.index ?: -1
+    // 하차까지 앞으로 지날 정류장 수 (1 = 다음 정류장에서 하차)
+    val remainingStops = riding?.stopsLeft ?: -1
 
     // ---- 다음 장소 힌트: 가까워질수록 하나씩 열린다 ----
     val lang = LocalLanguage.current
@@ -243,13 +227,15 @@ fun JourneyScreen(state: AppState, dayIndex: Int) {
         say(t(key, spokenDistance(currentGeom.lengthMeters, lang), currentLeg.durationMinutes))
     }
     LaunchedEffect(legIndex, currentSegIndex) {
-        // 구간 설명은 서버가 한국어로 주므로 한국어 화면에서만 읽는다
-        if (currentSegIndex >= 0 && lang == AppLanguage.KO) transitSegments[currentSegIndex].description?.let(say)
+        // 정류장에 도착한 순간 탈 버스와 하차 정류장을 알려 준다.
+        // 구간 설명은 서버가 한국어로 주므로 한국어 화면에서만 그대로 읽고, 다른 언어는 화면을 보라고 안내
+        val r = riding ?: return@LaunchedEffect
+        say(if (lang == AppLanguage.KO) r.description else t("voice.atStop"))
     }
     LaunchedEffect(legIndex, currentSegIndex, remainingStops) {
         when (remainingStops) {
-            1 -> say(t("voice.alightNext"))
-            0 -> say(t("voice.alightNow"))
+            2 -> say(t("voice.alightNext"))   // 다음다음 정류장에서 내린다
+            1 -> say(t("voice.alightNow"))    // 이번(다가오는) 정류장에서 내린다
         }
     }
     val near = remainMeters <= 100.0 && currentGeom.lengthMeters > 200.0
@@ -336,20 +322,20 @@ fun JourneyScreen(state: AppState, dayIndex: Int) {
                 }
             }
 
-            if (currentLeg.mode == "TRANSIT") {
+            // 도착해 장소가 공개되면 버스 안내는 치운다
+            val showTransit = currentLeg.mode == "TRANSIT" && revealStop == null && !completed
+            if (showTransit && transitPhase != null) {
                 Spacer(Modifier.height(8.dp))
-                // 현재 타고 있는 구간 하나만 표시 (여러 구간이면 [현재/전체] 표시)
-                val segLabel = if (currentSegIndex >= 0) {
-                    val n = transitSegments.size
-                    val prefix = if (n > 1) "[${currentSegIndex + 1}/$n] " else ""
-                    prefix + (transitSegments[currentSegIndex].description ?: "")
-                } else {
-                    currentLeg.summary
-                        ?: tr(
-                            "journey.boardAlight",
-                            currentLeg.boardStop ?: tr("journey.stopFallback"),
-                            currentLeg.alightStop ?: tr("journey.stopFallback"),
-                        )
+                // 지금 단계 하나만 안내한다. 버스 번호·하차 정류장은 승차 정류장에 도착한 뒤에만 보인다
+                val segLabel = when (transitPhase) {
+                    is TransitPhase.WalkToStop -> tr(
+                        if (transitPhase.transfer) "journey.walkToTransfer" else "journey.walkToStop",
+                        transitPhase.stopName ?: tr("journey.stopFallback"),
+                    )
+                    is TransitPhase.Riding ->
+                        (if (transitPhase.total > 1) "[${transitPhase.index + 1}/${transitPhase.total}] " else "") +
+                            transitPhase.description
+                    TransitPhase.WalkToDestination -> tr("journey.walkAfterAlight")
                 }
                 MapPill(
                     segLabel,
@@ -358,16 +344,33 @@ fun JourneyScreen(state: AppState, dayIndex: Int) {
                         .padding(horizontal = 16.dp),
                     color = WebOrangeDark,
                 )
-                // 하차까지 남은 정거장 수
+                // 하차까지 남은 정거장 수 — 1이면 다가오는 정류장이 하차 정류장
                 if (remainingStops >= 0) {
                     Spacer(Modifier.height(6.dp))
                     MapPill(
-                        if (remainingStops == 0) tr("journey.alightNow")
+                        if (remainingStops <= 1) tr("journey.alightNow")
                         else tr("journey.stopsLeft", remainingStops),
                         Modifier.align(Alignment.CenterHorizontally),
                         color = WebOrangeDark,
                     )
                 }
+            } else if (showTransit) {
+                // 버스 정보가 없는 구간 — 경로 API를 못 써서 거리로 추정했거나 옛 데이터
+                Spacer(Modifier.height(8.dp))
+                val estimated = currentLeg.estimated || currentLeg.summary?.contains("추정") == true
+                MapPill(
+                    if (estimated) tr("journey.transitEstimated")
+                    else currentLeg.summary
+                        ?: tr(
+                            "journey.boardAlight",
+                            currentLeg.boardStop ?: tr("journey.stopFallback"),
+                            currentLeg.alightStop ?: tr("journey.stopFallback"),
+                        ),
+                    Modifier
+                        .align(Alignment.CenterHorizontally)
+                        .padding(horizontal = 16.dp),
+                    color = WebOrangeDark,
+                )
             }
 
             Spacer(Modifier.weight(1f))

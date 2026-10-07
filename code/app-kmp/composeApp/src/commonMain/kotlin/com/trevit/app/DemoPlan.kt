@@ -51,7 +51,7 @@ fun buildDemoPlan(budget: Long, days: Int, people: Int, region: String? = null):
         boardLat = 36.3499, boardLng = 127.3856, alightLat = 36.3281, alightLng = 127.4260,
         steps = listOf(
             StepDto("WALK", "도보 120m → 시청 정류장", 120.0, 2),
-            StepDto("BUS", "618번 버스 · 시청 승차 → 은행동 하차", 4900.0, 17),
+            StepDto("BUS", "618번 버스 · 시청 승차 → 은행동 하차 (9개 정류장)", 4900.0, 17),
             StepDto("WALK", "도보 180m → 목적지", 180.0, 3),
         ),
     )
@@ -63,7 +63,7 @@ fun buildDemoPlan(budget: Long, days: Int, people: Int, region: String? = null):
         departAt = "12:10", arriveAt = "12:35",
         steps = listOf(
             StepDto("WALK", "도보 150m → 은행동 정류장", 150.0, 2),
-            StepDto("BUS", "911번 버스 · 은행동 승차 → 정부청사 하차", 5200.0, 20),
+            StepDto("BUS", "911번 버스 · 은행동 승차 → 정부청사 하차 (10개 정류장)", 5200.0, 20),
             StepDto("WALK", "도보 250m → 목적지", 250.0, 3),
         ),
     )

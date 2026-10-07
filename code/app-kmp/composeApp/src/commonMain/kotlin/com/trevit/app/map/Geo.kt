@@ -58,13 +58,17 @@ class LegGeometry(val leg: LegDto, from: StopDto, to: StopDto) {
         return (aLat + (bLat - aLat) * t) to (aLng + (bLng - aLng) * t)
     }
 
-    /** 좌표를 경로 위 가장 가까운 지점으로 투영해, 시작으로부터의 거리(m)를 돌려준다 */
-    fun project(lat: Double, lng: Double): Double {
+    /**
+     * 좌표를 경로 위 가장 가까운 지점으로 투영해, 시작으로부터의 거리(m)를 돌려준다.
+     * [minAlong] 보다 앞쪽 구간은 보지 않는다 — 정류장을 순서대로 투영할 때 되돌아오는 길에 붙지 않게.
+     */
+    fun project(lat: Double, lng: Double, minAlong: Double = 0.0): Double {
         val mPerDegLat = 111_320.0
         val mPerDegLng = 111_320.0 * cos(toRadians(lat))
         var bestDist = Double.MAX_VALUE
-        var bestAlong = 0.0
+        var bestAlong = minAlong.coerceIn(0.0, lengthMeters)
         for (i in 1 until points.size) {
+            if (cumulative[i] < minAlong) continue
             val (aLat, aLng) = points[i - 1]
             val (bLat, bLng) = points[i]
             val ax = (aLng - lng) * mPerDegLng; val ay = (aLat - lat) * mPerDegLat

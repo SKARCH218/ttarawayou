@@ -29,6 +29,8 @@ class RouteService(
     private val publicBusService: PublicBusService,
     private val intercityBusService: IntercityBusService,
     private val tmapService: TmapService,
+    /** 경로 API 결과 DB 저장소 (테스트에서는 없음) */
+    private val routeCache: RouteCacheStore? = null,
 ) {
 
     private val log = LoggerFactory.getLogger(RouteService::class.java)
@@ -54,16 +56,31 @@ class RouteService(
         log.warn("OSRM 실패({}) — 60초간 직선 보간 폴백", reason)
     }
 
+    /** ODsay 하루 호출량 초과 시 이 시각까지 호출을 건너뛴다 */
+    @Volatile
+    private var odsayBlockedUntil: Long = 0
+
     /** 1인 기준 도보 구간 생성 (요금 0) */
     fun walkLeg(fromLat: Double, fromLng: Double, toLat: Double, toLng: Double): LegDto {
         val key = "W:${round(fromLat)},${round(fromLng)}>${round(toLat)},${round(toLng)}"
-        return cache.computeIfAbsent(key) { fetchWalk(fromLat, fromLng, toLat, toLng) }
+        return memo(key) { fetchWalk(key, fromLat, fromLng, toLat, toLng) }
     }
 
     /** 1인 기준 대중교통 구간 생성. fare는 1인 요금 */
     fun transitLeg(fromLat: Double, fromLng: Double, toLat: Double, toLng: Double): LegDto {
         val key = "T:${round(fromLat)},${round(fromLng)}>${round(toLat)},${round(toLng)}"
-        return cache.computeIfAbsent(key) { fetchTransit(fromLat, fromLng, toLat, toLng) }
+        return memo(key) { fetchTransit(key, fromLat, fromLng, toLat, toLng) }
+    }
+
+    /**
+     * 메모리 캐시. 추정 구간은 담지 않는다 — 담아 두면 API 호출량이 다시 풀린 뒤에도
+     * 서버를 재시작할 때까지 그 구간은 계속 "추정"으로 나간다.
+     */
+    private fun memo(key: String, fetch: () -> LegDto): LegDto {
+        cache[key]?.let { return it }
+        val leg = fetch()
+        if (!leg.estimated) cache[key] = leg
+        return leg
     }
 
     // ---------- 도보 ----------
@@ -92,7 +109,15 @@ class RouteService(
         return Regex("([0-9A-Za-z가-힣-]+)번").find(text)?.groupValues?.get(1)
     }
 
-    private fun fetchWalk(fromLat: Double, fromLng: Double, toLat: Double, toLng: Double): LegDto {
+    private fun fetchWalk(key: String, fromLat: Double, fromLng: Double, toLat: Double, toLng: Double): LegDto {
+        // 0순위: 예전에 받아 둔 경로 (DB)
+        routeCache?.get(key, WALK_CACHE_TTL)?.let { return it }
+        val leg = fetchWalkLive(fromLat, fromLng, toLat, toLng)
+        routeCache?.put(key, leg)   // 추정 경로는 저장하지 않는다
+        return leg
+    }
+
+    private fun fetchWalkLive(fromLat: Double, fromLng: Double, toLat: Double, toLng: Double): LegDto {
         // 1순위: TMAP 보행자 경로 (한국 보행로 데이터)
         tmapService.walkRoute(fromLat, fromLng, toLat, toLng)?.let { tw ->
             return LegDto("WALK", tw.distanceMeters, tw.minutes, 0, "도보 " + fmtKm(tw.distanceMeters), tw.path)
@@ -124,21 +149,33 @@ class RouteService(
         val d = GeoUtil.distanceMeters(fromLat, fromLng, toLat, toLng) * 1.3
         val minutes = maxOf(1L, Math.round(d / WALK_SPEED_M_PER_MIN)).toInt()
         return LegDto("WALK", d, minutes, 0, "도보 " + fmtKm(d) + " (추정)",
-            straightPath(fromLat, fromLng, toLat, toLng))
+            straightPath(fromLat, fromLng, toLat, toLng), estimated = true)
     }
 
     // ---------- 대중교통 ----------
 
-    private fun fetchTransit(fromLat: Double, fromLng: Double, toLat: Double, toLng: Double): LegDto {
-        // 1순위: TMAP 대중교통 (경로좌표·요금·환승 포함)
-        var leg: LegDto? = tmapService.transitLeg(fromLat, fromLng, toLat, toLng)
-        // 2순위: ODsay
-        if (leg == null && odsayKey.isNotEmpty()) {
-            try {
-                leg = fetchOdsay(fromLat, fromLng, toLat, toLng)
-            } catch (e: Exception) {
-                log.warn("ODsay 호출 실패, 거리 기반 추정 폴백: {}", e.message)
+    private fun fetchTransit(key: String, fromLat: Double, fromLng: Double, toLat: Double, toLng: Double): LegDto {
+        // 0순위: 예전에 받아 둔 경로 (DB) — 대중교통 API는 하루 호출량이 작아 최대한 다시 쓴다
+        var leg: LegDto? = routeCache?.get(key, TRANSIT_CACHE_TTL)
+        if (leg == null) {
+            // 1순위: TMAP 대중교통 (경로좌표·요금·환승 포함)
+            leg = tmapService.transitLeg(fromLat, fromLng, toLat, toLng)
+            // 2순위: ODsay
+            if (leg == null && odsayKey.isNotEmpty() && System.currentTimeMillis() >= odsayBlockedUntil) {
+                try {
+                    leg = fetchOdsay(fromLat, fromLng, toLat, toLng)
+                } catch (e: Exception) {
+                    if (e.message?.contains("429") == true || e.message?.contains("quota", ignoreCase = true) == true) {
+                        // 하루 호출량 초과 — 매 구간마다 다시 두드리지 않도록 잠시 멈춘다
+                        odsayBlockedUntil = System.currentTimeMillis() + ODSAY_BLOCK_MS
+                        log.warn("ODsay 호출량 초과 — 10분간 호출 중단, 거리 기반 추정 폴백")
+                    } else {
+                        log.warn("ODsay 호출 실패, 거리 기반 추정 폴백: {}", e.message)
+                    }
+                }
             }
+            // 시외버스 시간표는 시각에 따라 바뀌므로 결합 전 원본 경로만 저장한다
+            leg?.let { routeCache?.put(key, it) }
         }
         var result = leg ?: estimateTransit(fromLat, fromLng, toLat, toLng)
         // 시외 이동이면 시외버스 터미널·시간표·요금 정보를 결합
@@ -382,7 +419,7 @@ class RouteService(
         } else {
             path = straightPath(fromLat, fromLng, toLat, toLng)
         }
-        return LegDto("TRANSIT", distance, minutes, fare, "버스 이동 (요금·시간 추정)", path)
+        return LegDto("TRANSIT", distance, minutes, fare, "버스 이동 (요금·시간 추정)", path, estimated = true)
     }
 
     companion object {
@@ -390,6 +427,11 @@ class RouteService(
         private const val BASE_BUS_FARE = 1500L         // 시내버스 성인 요금(카드) 추정
         private const val DEFAULT_BUS_WAIT_MIN = 7      // 버스 대기 기본값 (API 정보가 없을 때)
         private const val REALTIME_WINDOW_MIN = 30L     // 이 안에 출발하는 구간은 실시간 도착정보를 쓴다
+        private const val ODSAY_BLOCK_MS = 10 * 60_000L // ODsay 호출량 초과 시 쉬는 시간
+
+        /** 저장해 둔 경로를 다시 쓰는 기간 — 노선은 자주 바뀌지 않지만 개편을 반영하도록 만료시킨다 */
+        private val TRANSIT_CACHE_TTL: java.time.Duration = java.time.Duration.ofDays(30)
+        private val WALK_CACHE_TTL: java.time.Duration = java.time.Duration.ofDays(90)
 
         /** 이 직선거리(m)를 넘는 이동은 시외로 보고 시외버스 정보를 결합한다 */
         private const val INTERCITY_THRESHOLD_M = 30_000.0

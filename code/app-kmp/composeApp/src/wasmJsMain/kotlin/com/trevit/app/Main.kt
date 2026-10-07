@@ -2,7 +2,6 @@ package com.trevit.app
 
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
 import com.trevit.app.i18n.AppLanguage
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -72,23 +71,36 @@ fun main() {
 
             // 일본어·중국어는 한자가 Pretendard 에 없어 □로 나온다 → 해당 언어를 고를 때만 Noto 폰트를 받아 등록.
             // (4~8MB라 한국어·영어 사용자는 받지 않는다)
-            // 등록이 끝나면 앱을 한 번 다시 그려서(key) 이미 □로 그려진 글자를 새 폰트로 다시 배치한다.
-            var fontGeneration by remember { mutableStateOf(0) }
+            // 한 번 □로 그려진 글자는 폰트를 나중에 등록해도 다시 그려지지 않는다(화면을 나갔다 와야 고쳐짐).
+            // 그래서 폰트를 먼저 받고, 다 받은 뒤에야 언어를 바꾸거나(설정) 앱을 그린다(시작).
             val loadedCjk = remember { mutableSetOf<String>() }
-            LaunchedEffect(state.language) {
-                val file = when (state.language) {
+            suspend fun ensureCjkFont(lang: AppLanguage) {
+                val file = when (lang) {
                     AppLanguage.JA -> "font/noto_sans_jp_regular.otf"
                     AppLanguage.ZH -> "font/noto_sans_sc_regular.otf"
-                    else -> return@LaunchedEffect
+                    else -> return
                 }
-                if (!loadedCjk.add(file)) return@LaunchedEffect
-                runCatching {
-                    val name = file.substringAfterLast('/').substringBefore('.')
-                    fontFamilyResolver.preload(FontFamily(Font(name, Res.readBytes(file), FontWeight.Normal)))
-                    fontGeneration++
-                }.onFailure { loadedCjk.remove(file) } // 실패하면 다음에 다시 시도
+                if (file in loadedCjk) return
+                val name = file.substringAfterLast('/').substringBefore('.')
+                fontFamilyResolver.preload(FontFamily(Font(name, Res.readBytes(file), FontWeight.Normal)))
+                loadedCjk += file
             }
-            key(fontGeneration) { TrevitApp(state) }
+            remember { state.defersLanguageChange = true }
+
+            // 설정에서 고른 언어: 폰트를 받은 뒤 적용 (실패해도 적용 — 한자만 □)
+            LaunchedEffect(state.pendingLanguage) {
+                val lang = state.pendingLanguage ?: return@LaunchedEffect
+                runCatching { ensureCjkFont(lang) }
+                state.applyLanguage(lang)
+            }
+
+            // 저장된 언어가 일본어·중국어면 폰트를 받은 뒤에 처음 그린다
+            var startReady by remember { mutableStateOf(false) }
+            LaunchedEffect(Unit) {
+                runCatching { ensureCjkFont(state.language) }
+                startReady = true
+            }
+            if (startReady) TrevitApp(state)
         }
     }
 }

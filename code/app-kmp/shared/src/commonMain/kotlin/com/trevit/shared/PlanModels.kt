@@ -100,6 +100,7 @@ data class LegDto(
     val alightLng: Double? = null,
     val stations: List<List<Double>>? = null,     // 경유 정류장 좌표
     val steps: List<StepDto>? = null,
+    val estimated: Boolean = false,    // 경로 API를 못 써서 거리로 추정한 구간 (버스·정류장 정보 없음)
 )
 
 @Serializable

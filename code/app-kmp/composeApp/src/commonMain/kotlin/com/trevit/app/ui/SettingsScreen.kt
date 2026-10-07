@@ -173,7 +173,8 @@ fun SettingsScreen(state: AppState) {
             SettingsGroup {
                 SettingsRow(
                     title = tr("settings.language"),
-                    value = state.language.nativeName,
+                    // 웹은 일본어·중국어 폰트를 받는 동안 기존 언어를 유지한다
+                    value = state.pendingLanguage?.let { "${it.nativeName} …" } ?: state.language.nativeName,
                     onClick = { dialog = SettingsDialog.Language },
                 )
                 RowDivider()

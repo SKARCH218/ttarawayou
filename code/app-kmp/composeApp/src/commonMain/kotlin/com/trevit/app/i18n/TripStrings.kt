@@ -77,13 +77,38 @@ internal val tripStrings: Map<String, List<String>> = mapOf(
         "{0} 上车 → {1} 下车",
     ),
     "journey.stopFallback" to listOf("정류장", "stop", "停留所", "车站"),
+    // 남은 정거장이 1 = 다가오는 정류장이 하차 정류장 (한국 버스 안내의 "이번 정류장")
     "journey.alightNow" to listOf(
         "이번 정거장에서 하차하세요",
-        "Get off at this stop",
-        "この停留所で降りてください",
-        "请在本站下车",
+        "Get off at the next stop",
+        "次の停留所で降りてください",
+        "请在下一站下车",
     ),
     "journey.stopsLeft" to listOf("하차까지 {0}정거장", "{0} stops to go", "下車まで {0} 停留所", "还有 {0} 站下车"),
+    "journey.walkToStop" to listOf(
+        "🚏 {0} 정류장까지 걸어가세요",
+        "🚏 Walk to the {0} stop",
+        "🚏 {0} 停留所まで歩いてください",
+        "🚏 请步行至 {0} 站",
+    ),
+    "journey.walkToTransfer" to listOf(
+        "🚏 환승 · {0} 정류장까지 걸어가세요",
+        "🚏 Transfer · Walk to the {0} stop",
+        "🚏 乗り換え · {0} 停留所まで歩いてください",
+        "🚏 换乘 · 请步行至 {0} 站",
+    ),
+    "journey.transitEstimated" to listOf(
+        "🚌 실시간 버스 정보를 불러오지 못했어요 · 보라색 길을 따라 대중교통으로 이동하세요",
+        "🚌 Couldn't load live bus info · Follow the purple path by public transit",
+        "🚌 バス情報を読み込めませんでした · 紫の道に沿って公共交通で移動してください",
+        "🚌 无法加载实时公交信息 · 请沿紫色路线乘公共交通前往",
+    ),
+    "journey.walkAfterAlight" to listOf(
+        "하차 완료 · 비밀 장소까지 걸어가세요",
+        "You're off · Walk to the secret spot",
+        "下車完了 · 秘密の場所まで歩いてください",
+        "已下车 · 请步行前往秘密地点",
+    ),
     "journey.hintPlaying" to listOf(
         "보라색 길을 따라가는 중이에요",
         "Following the purple path",
@@ -186,13 +211,21 @@ internal val tripStrings: Map<String, List<String>> = mapOf(
         "次の秘密の場所まで{0}、公共交通で約{1}分です。紫の道をたどってください。",
         "距离下一个秘密地点{0}，乘公共交通约{1}分钟。请沿着紫色路线前进。",
     ),
+    // 남은 정거장 2 — 다가오는 정류장 다음에서 내린다
     "voice.alightNext" to listOf(
         "다음 정거장에서 내릴 준비를 하세요.",
-        "Get ready to get off at the next stop.",
-        "次の停留所で降りる準備をしてください。",
-        "请准备在下一站下车。",
+        "Your stop is the one after next. Get ready.",
+        "二つ先の停留所で降ります。準備してください。",
+        "再过一站就要下车，请做好准备。",
     ),
-    "voice.alightNow" to listOf("이번 정거장에서 내리세요.", "Get off at this stop.", "この停留所で降りてください。", "请在本站下车。"),
+    // 남은 정거장 1 — 다가오는 정류장에서 내린다
+    "voice.alightNow" to listOf("이번 정거장에서 내리세요.", "Get off at the next stop.", "次の停留所で降りてください。", "请在下一站下车。"),
+    "voice.atStop" to listOf(
+        "정류장에 도착했어요. 화면에서 탈 버스와 내릴 정류장을 확인하세요.",
+        "You've reached the stop. Check the screen for your bus and where to get off.",
+        "停留所に着きました。乗るバスと降りる停留所を画面で確認してください。",
+        "已到达车站。请在屏幕上查看要乘坐的公交和下车站。",
+    ),
     "voice.near" to listOf(
         "비밀 장소까지 100미터 남았어요.",
         "100 meters to the secret spot.",

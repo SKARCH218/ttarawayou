@@ -139,9 +139,25 @@ class AppState(
     var themeMode by mutableStateOf(ThemeMode.fromCode(prefs.get(PREF_THEME)))
         private set
 
+    /**
+     * 언어를 바로 바꾸지 않고 준비(웹: 일본어·중국어 한자 폰트 받기)를 먼저 할지.
+     * 폰트가 준비되기 전에 언어를 바꾸면 한자가 □로 그려진 채 남으므로, 웹은 [pendingLanguage] 를 보고
+     * 폰트를 받은 뒤 [applyLanguage] 로 바꾼다. 안드로이드는 시스템 폰트라 바로 바꾼다.
+     */
+    var defersLanguageChange = false
+
+    /** 준비 중인 언어 — 설정 화면에 "불러오는 중"을 띄운다 */
+    var pendingLanguage by mutableStateOf<AppLanguage?>(null)
+        private set
+
     fun changeLanguage(value: AppLanguage) {
+        if (defersLanguageChange && value != language) pendingLanguage = value else applyLanguage(value)
+    }
+
+    fun applyLanguage(value: AppLanguage) {
         language = value
         prefs.put(PREF_LANGUAGE, value.code)
+        if (pendingLanguage == value) pendingLanguage = null
     }
 
     fun changeTheme(value: ThemeMode) {

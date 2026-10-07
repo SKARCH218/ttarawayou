@@ -3,6 +3,7 @@ package com.trevit.repository
 import com.trevit.entity.AuthToken
 import com.trevit.entity.EmailVerification
 import com.trevit.entity.Place
+import com.trevit.entity.RouteCache
 import com.trevit.entity.User
 import com.trevit.entity.Wallet
 import org.springframework.data.jpa.repository.JpaRepository
@@ -25,3 +26,5 @@ interface EmailVerificationRepository : JpaRepository<EmailVerification, String>
 interface AuthTokenRepository : JpaRepository<AuthToken, String> {
     fun deleteByUserId(userId: Long)
 }
+
+interface RouteCacheRepository : JpaRepository<RouteCache, String>
