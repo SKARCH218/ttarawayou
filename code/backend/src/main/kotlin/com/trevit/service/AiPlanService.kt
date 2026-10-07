@@ -10,6 +10,7 @@ import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.MediaType
 import org.springframework.http.client.SimpleClientHttpRequestFactory
 import org.springframework.stereotype.Service
+import org.springframework.web.client.HttpClientErrorException
 import org.springframework.web.client.RestClient
 import java.net.URI
 import java.util.Locale
@@ -72,7 +73,20 @@ class AiPlanService(
             places.forEach { p -> p.id?.let { registry[it] = p } }
             val content = if (agentEnabled && search != null) {
                 try {
-                    runAgent(prompt, registry, search, anchor)
+                    if (useResponsesApi) {
+                        runAgentResponses(prompt, registry, search, anchor)
+                    } else {
+                        try {
+                            runAgent(prompt, registry, search, anchor)
+                        } catch (e: HttpClientErrorException) {
+                            // 일부 모델(예: 게이트웨이의 gpt-6.1-sol)은 chat/completions 에서 도구를 못 쓰고
+                            // /v1/responses 로만 쓸 수 있다 — 한 번 확인되면 이후로는 바로 responses 방식
+                            if (!e.responseBodyAsString.contains("responses")) throw e
+                            log.info("이 모델은 chat/completions 에서 도구를 못 써 /responses 방식으로 전환")
+                            useResponsesApi = true
+                            runAgentResponses(prompt, registry, search, anchor)
+                        }
+                    }
                 } catch (e: Exception) {
                     // 모델·서버가 도구 호출을 지원하지 않는 경우 등 — 도구 없이 한 번 더
                     log.warn("AI 도구 호출 모드 실패({}) → 도구 없이 재시도", e.message)
@@ -277,6 +291,64 @@ class AiPlanService(
      * AI가 필요할 때 도구를 호출하며 일정을 짠다. 도구 결과를 대화에 붙여 다시 묻기를 반복하고,
      * 마지막 차례에는 도구를 못 쓰게 해(tool_choice=none) 반드시 최종 JSON을 내게 한다.
      */
+    /** 한 번 /responses 가 필요하다고 확인된 모델이면 이후 요청은 바로 그 방식으로 */
+    @Volatile
+    private var useResponsesApi = false
+
+    /**
+     * OpenAI Responses 형식의 도구 호출 루프. 게이트웨이가 previous_response_id 를 지원하지 않아
+     * 매 요청마다 대화 전체(사용자 요청 + 모델 출력 항목 + 도구 결과)를 input 으로 다시 보낸다.
+     */
+    private fun runAgentResponses(
+        prompt: String, registry: MutableMap<Long, Place>, search: PlaceSearch, anchor: Pair<Double, Double>?,
+    ): String {
+        val input = mapper.createArrayNode()
+        input.addObject().put("role", "user").put("content", prompt)
+        for (turn in 0 until maxOf(1, maxToolTurns)) {
+            val last = turn == maxToolTurns - 1
+            val body = mapper.createObjectNode()
+            body.put("model", model)
+            body.put("instructions", AGENT_SYSTEM)
+            body.put("max_output_tokens", maxTokens)
+            body.set<JsonNode>("input", input)
+            body.set<JsonNode>("tools", responsesToolSchemas)
+            body.put("tool_choice", if (last) "none" else "auto")
+            val output = mapper.readTree(post(mapper.writeValueAsString(body), "/responses")).path("output")
+            val calls = output.filter { it.path("type").asText() == "function_call" }
+            if (last || calls.isEmpty()) {
+                return output.filter { it.path("type").asText() == "message" }
+                    .flatMap { it.path("content") }
+                    .joinToString("") { it.path("text").asText("") }
+            }
+            output.forEach { input.add(it) }
+            for (call in calls) {
+                val name = call.path("name").asText()
+                val args = runCatching { mapper.readTree(call.path("arguments").asText("{}")) }
+                    .getOrElse { mapper.createObjectNode() }
+                val result = runCatching { runTool(name, args, registry, search, anchor) }
+                    .getOrElse { mapper.createObjectNode().put("error", it.message ?: "도구 실행 실패").toString() }
+                log.info("AI 도구 호출(responses) [{}] {} → {}자", turn + 1, name, result.length)
+                input.addObject().put("type", "function_call_output")
+                    .put("call_id", call.path("call_id").asText())
+                    .put("output", result)
+            }
+        }
+        return ""
+    }
+
+    /** Responses 형식 도구 정의 — chat 형식의 {type, function:{...}} 를 {type, name, description, parameters} 로 편다 */
+    private val responsesToolSchemas: JsonNode by lazy {
+        val arr = mapper.createArrayNode()
+        for (t in toolSchemas) {
+            val f = t.path("function")
+            arr.addObject().put("type", "function")
+                .put("name", f.path("name").asText())
+                .put("description", f.path("description").asText())
+                .set<JsonNode>("parameters", f.path("parameters"))
+        }
+        arr
+    }
+
     private fun runAgent(
         prompt: String, registry: MutableMap<Long, Place>, search: PlaceSearch, anchor: Pair<Double, Double>?,
     ): String {
@@ -393,12 +465,12 @@ class AiPlanService(
         return mapper.readTree(res).path("choices").path(0).path("message")
     }
 
-    private fun post(json: String): String {
+    private fun post(json: String, path: String = "/chat/completions"): String {
         // 응답을 바이트로 받아 직접 문자열로 바꾼다.
         // LM Studio 는 버전·설정에 따라 Content-Type 을 application/octet-stream 으로 주기도 하는데,
         // String 으로 바로 받으면 컨버터를 못 찾아 "Error while extracting response" 로 실패한다.
         val res = http.post()
-            .uri(URI.create("$baseUrl/chat/completions"))
+            .uri(URI.create("$baseUrl$path"))
             .contentType(MediaType.APPLICATION_JSON)
             // LM Studio가 이따금 Content-Type을 application/octet-stream으로 내려줄 때가 있어
             // application/json만 명시하면 컨버터를 못 찾고 실패한다. 어차피 바이트로 받아 직접

@@ -62,4 +62,53 @@ class AiAgentLoopTest {
             server.stop(0)
         }
     }
+
+    @Test
+    fun `chat 방식이 도구를 거부하면 responses 방식으로 전환한다`() {
+        val responsesBodies = CopyOnWriteArrayList<String>()
+        val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
+        // 게이트웨이의 gpt-6.1-sol 처럼: chat/completions + tools 는 400
+        server.createContext("/v1/chat/completions") { ex ->
+            ex.requestBody.readBytes()
+            val bytes = """{"detail":{"code":400,"message":"Function tools are not supported in /v1/chat/completions. To use function tools, use /v1/responses"}}""".toByteArray()
+            ex.sendResponseHeaders(400, bytes.size.toLong())
+            ex.responseBody.use { it.write(bytes) }
+        }
+        server.createContext("/v1/responses") { ex ->
+            val body = ex.requestBody.readBytes().toString(Charsets.UTF_8)
+            responsesBodies += body
+            val reply = if (responsesBodies.size == 1) {
+                """{"output":[{"type":"function_call","call_id":"call_9","name":"search_places",
+                   "arguments":"{\"query\":\"루프탑 카페\",\"kind\":\"restaurant\",\"near_place_id\":1}"}]}"""
+            } else {
+                """{"output":[{"type":"message","content":[{"type":"output_text",
+                   "text":"{\"lodgingId\":0,\"days\":[{\"stopIds\":[1,777]}],\"reason\":\"좋아요\"}"}]}]}"""
+            }
+            val bytes = reply.toByteArray()
+            ex.sendResponseHeaders(200, bytes.size.toLong())
+            ex.responseBody.use { it.write(bytes) }
+        }
+        server.start()
+        try {
+            val ai = AiPlanService(
+                "http://127.0.0.1:${server.address.port}/v1", "gpt-6.1-sol", true, 5000, "", 1000,
+                agentEnabled = true, maxToolTurns = 4,
+            )
+            val sight = Place("경복궁", Place.PlaceType.ATTRACTION, "서울 종로구", 37.5796, 126.9770, 9000, 4.7, "")
+                .also { it.id = 1 }
+            val search = AiPlanService.PlaceSearch { _, type, _, _, _ ->
+                listOf(Place("하늘 루프탑", type, "서울 종로구", 37.5800, 126.9780, 9000, 4.5, "").also { it.id = 777 })
+            }
+            val sel = ai.plan(21_000, 1, 1, 0, listOf(sight), search = search, anchor = 37.58 to 126.977)
+
+            assertNotNull(sel, "responses 방식 결과가 버려졌음")
+            assertEquals(listOf(1L, 777L), sel!!.days[0].map { it.id })
+            assertEquals(2, responsesBodies.size)
+            assertTrue(responsesBodies[1].contains("\"function_call_output\"") && responsesBodies[1].contains("\"call_9\"") &&
+                responsesBodies[1].contains("\"function_call\""), "두 번째 요청에 대화 전체(호출+결과)가 실리지 않음")
+            println("responses 전환 OK — 최종 일정: ${sel.days[0].map { it.name }}")
+        } finally {
+            server.stop(0)
+        }
+    }
 }
