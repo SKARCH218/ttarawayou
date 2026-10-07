@@ -887,14 +887,16 @@ class PlanService(
                 restaurants = pool.restaurants.filter { it.id !in used && dist(lat, lng, it) <= radius }
                 if (attractions.size >= spotsPerDay && restaurants.size >= 3) break
             }
-            // 그래도 모자라면(긴 여행 뒤쪽 날짜) 반경과 관계없이 가까운 남은 장소로 채운다 — 빈 날을 만들지 않는다
-            if (attractions.size < spotsPerDay) {
-                attractions = pool.attractions.filter { it.id !in used }.sortedBy { dist(lat, lng, it) }
-                    .take(spotsPerDay + ZONE_SPARE)
+            // 반경 안에 하나도 없을 때만(긴 여행 뒤쪽 날짜 등) 가까운 남은 장소로 채운다 — 빈 날을 만들지 않는다.
+            // 조금 모자란 날은 장소를 적게 두는 쪽이 낫다 (멀리서 끌어오면 하루 동선이 다시 길어진다)
+            // 단, ZONE_FALLBACK_M 밖까지는 가지 않는다 — 그보다 멀면 하루 안에 10km 구간이 생긴다
+            if (attractions.isEmpty()) {
+                attractions = pool.attractions.filter { it.id !in used && dist(lat, lng, it) <= ZONE_FALLBACK_M }
+                    .sortedBy { dist(lat, lng, it) }.take(spotsPerDay)
             }
-            if (restaurants.size < 3) {
-                restaurants = pool.restaurants.filter { it.id !in used }.sortedBy { dist(lat, lng, it) }
-                    .take(3 + ZONE_SPARE)
+            if (restaurants.isEmpty()) {
+                restaurants = pool.restaurants.filter { it.id !in used && dist(lat, lng, it) <= ZONE_FALLBACK_M }
+                    .sortedBy { dist(lat, lng, it) }.take(3)
             }
             // 하루에 쓸 만큼 + 여유분(ZONE_SPARE)만 그날 몫으로 잡는다. 많이 잡아 두면 긴 여행에서
             // 뒤쪽 날짜에 남는 후보가 없어 빈 날이 생긴다 (예: 7일 여행의 6·7일차).
@@ -1027,6 +1029,7 @@ class PlanService(
         private const val HUB_RADIUS_M = 1500.0
         private const val HUB_MIN_GAP_M = 3000.0
         private val ZONE_RADII_M = listOf(1500.0, 2500.0, 4000.0) // 후보가 모자라면 넓혀 본다
+        private const val ZONE_FALLBACK_M = 6_000.0 // 동네 안에 하나도 없을 때 보충하러 가는 최대 거리
         private const val ZONE_SPARE = 2         // 날마다 필요한 수보다 더 잡아 두는 후보 수 (교체·AI 선택 여유)
         private const val NEARBY_LODGINGS = 8
         private const val NEAR_REGION_M = 15_000.0  // 이 안이면 "그 지역에 와 있다"고 본다
