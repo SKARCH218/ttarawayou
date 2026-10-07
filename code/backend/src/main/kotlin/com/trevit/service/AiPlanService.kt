@@ -80,11 +80,14 @@ class AiPlanService(
                             runAgent(prompt, registry, search, anchor)
                         } catch (e: HttpClientErrorException) {
                             // 일부 모델(예: 게이트웨이의 gpt-6.1-sol)은 chat/completions 에서 도구를 못 쓰고
-                            // /v1/responses 로만 쓸 수 있다 — 한 번 확인되면 이후로는 바로 responses 방식
-                            if (!e.responseBodyAsString.contains("responses")) throw e
-                            log.info("이 모델은 chat/completions 에서 도구를 못 써 /responses 방식으로 전환")
+                            // /v1/responses 로만 쓸 수 있다. 거부 문구가 상황마다 달라(reasoning_effort 등)
+                            // 400이면 responses 방식으로 한 번 시도하고, 되면 이후로는 바로 그 방식을 쓴다
+                            if (e.statusCode.value() != 400) throw e
+                            log.info("chat 방식 도구 호출 거부(400): {}", e.responseBodyAsString.take(200))
+                            val content = runAgentResponses(prompt, registry, search, anchor)
+                            log.info("이 모델은 /responses 방식으로 도구를 쓴다 — 이후 요청부터 바로 사용")
                             useResponsesApi = true
-                            runAgentResponses(prompt, registry, search, anchor)
+                            content
                         }
                     }
                 } catch (e: Exception) {

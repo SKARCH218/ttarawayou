@@ -147,7 +147,7 @@ class RegionService(private val tmapService: TmapService) {
             .replace(Regex("(시|군)$"), "")
         val center = province ?: (36.5 to 127.8)
         val region = listOf("${base}시청", "${base}군청", base).firstNotNullOfOrNull { query ->
-            tmapService.searchPois(query, center.first, center.second, 3)
+            tmapService.searchPois(query, center.first, center.second, 3, radiusKm = 0)
                 .firstOrNull { it.name.startsWith(base) }
                 ?.let { Region(q, it.lat, it.lng) }
         }

@@ -234,14 +234,18 @@ class TmapService(@Value("\${tmap.app-key}") appKey: String?) {
     }
 
     /** 장소 이름으로 검색 (기준 좌표에서 가까운 순). "꼭 가고 싶은 곳" 찾기용 */
-    fun searchPois(keyword: String, lat: Double, lng: Double, count: Int): List<Poi> {
+    /**
+     * [radiusKm] 1~33 (km) 또는 0(전국). 거리순 정렬(searchtypCd=R)에서는 반경이 필수 파라미터라
+     * 빠지면 TMAP이 400 "필수 파라메터가 없습니다"를 돌려준다.
+     */
+    fun searchPois(keyword: String, lat: Double, lng: Double, count: Int, radiusKm: Int = 0): List<Poi> {
         if (!usable()) return emptyList()
         val out = ArrayList<Poi>()
         try {
             val url = String.format(
                 Locale.US,
-                "%s/tmap/pois?version=1&searchKeyword=%s&centerLon=%f&centerLat=%f&searchtypCd=R&page=1&count=%d",
-                BASE, URLEncoder.encode(keyword, StandardCharsets.UTF_8), lng, lat, minOf(20, count),
+                "%s/tmap/pois?version=1&searchKeyword=%s&centerLon=%f&centerLat=%f&searchtypCd=R&radius=%d&page=1&count=%d",
+                BASE, URLEncoder.encode(keyword, StandardCharsets.UTF_8), lng, lat, radiusKm.coerceIn(0, 33), minOf(20, count),
             )
             val res = http.get().uri(URI.create(url))
                 .header("appKey", appKey).retrieve().body(String::class.java)

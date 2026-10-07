@@ -56,7 +56,7 @@ class PlaceProviderService(
             .firstOrNull { it.name.contains(q) || q.contains(it.name) }
             ?.let { return it }
 
-        val poi = tmapService.searchPois(q, lat, lng, 5)
+        val poi = tmapService.searchPois(q, lat, lng, 5, radiusKm = 0)
             .firstOrNull { GeoUtil.distanceMeters(lat, lng, it.lat, it.lng) <= MUST_VISIT_RADIUS_M }
             ?: return null
         val type = if (Regex("음식|식당|카페|주점|베이커리").containsMatchIn(poi.category)) PlaceType.RESTAURANT
@@ -118,7 +118,7 @@ class PlaceProviderService(
         if (!tmapService.usable()) return emptyList()
         return searches.flatMap { (keyword, type, label) ->
             val key = String.format(Locale.US, "%.2f,%.2f,%s", lat, lng, keyword)
-            val pois = prefCache.getOrPut(key) { tmapService.searchPois(keyword, lat, lng, PREF_FETCH_COUNT) }
+            val pois = prefCache.getOrPut(key) { tmapService.searchPois(keyword, lat, lng, PREF_FETCH_COUNT, radiusKm = Math.ceil(radiusM / 1000).toInt().coerceIn(1, 33)) }
             toPlaces(pois.filter { GeoUtil.distanceMeters(lat, lng, it.lat, it.lng) <= radiusM }, type,
                 "취향 검색: $label").onEach { it.tags = setOf(label) }
         }

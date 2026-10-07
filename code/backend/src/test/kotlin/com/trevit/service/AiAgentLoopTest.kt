@@ -70,7 +70,8 @@ class AiAgentLoopTest {
         // 게이트웨이의 gpt-6.1-sol 처럼: chat/completions + tools 는 400
         server.createContext("/v1/chat/completions") { ex ->
             ex.requestBody.readBytes()
-            val bytes = """{"detail":{"code":400,"message":"Function tools are not supported in /v1/chat/completions. To use function tools, use /v1/responses"}}""".toByteArray()
+            // 실제 게이트웨이가 돌려준 문구 — "responses"라는 단어가 없어도 전환돼야 한다
+            val bytes = """{"detail":{"code":400,"message":"invalid_request_error - Unsupported value: 'reasoning_effort' does not support 'none' with this model."}}""".toByteArray()
             ex.sendResponseHeaders(400, bytes.size.toLong())
             ex.responseBody.use { it.write(bytes) }
         }
