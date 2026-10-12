@@ -70,14 +70,24 @@ object PreferenceKeywords {
     fun of(label: String): Pref? = table[label]
 
     /**
+     * 보기에 없는 값 = 여행자가 "기타"로 직접 적은 취향 (예: "루프탑 카페", "닭갈비").
+     * 직접 적었다는 건 가장 분명한 의도라 검색·점수·AI 프롬프트에서 가장 먼저 반영한다.
+     */
+    fun custom(req: PlanRequest): List<String> =
+        (others(req) + foods(req)).filter { table[it] == null && it.isNotBlank() }.distinct()
+
+    /**
      * 따로 찾아올 검색어 목록 (검색어, 장소 종류, 취향 라벨).
      * 취향마다 하나씩 돌아가며 뽑아 [limit] 개까지 — 외부 API 호출 수를 제한하면서 고르게 반영한다.
      * 표에 없는 값(직접 입력한 취향)은 그 단어 자체로 검색한다.
      */
     fun searches(req: PlanRequest, limit: Int): List<Triple<String, PlaceType, String>> {
-        val lists = others(req).map { label -> label to (table[label]?.searches ?: listOf(label to A)) } +
-            foods(req).map { label -> label to (table[label]?.searches ?: listOf(label to R)) }
+        val foodSet = foods(req).toSet()
         val out = ArrayList<Triple<String, PlaceType, String>>()
+        // 직접 적은 취향은 한도와 상관없이 먼저, 빠짐없이 검색한다
+        for (label in custom(req)) out += Triple(label, if (label in foodSet) R else A, label)
+        val lists = others(req).filter { table[it] != null }.map { label -> label to table.getValue(label).searches } +
+            foods(req).filter { table[it] != null }.map { label -> label to table.getValue(label).searches }
         var round = 0
         while (out.size < limit) {
             var added = false

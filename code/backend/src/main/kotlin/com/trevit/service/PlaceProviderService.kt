@@ -46,19 +46,24 @@ class PlaceProviderService(
 
     /**
      * "꼭 가고 싶은 곳" 이름을 실제 장소로 찾는다.
-     * 후보 목록에 이미 있으면 그걸 쓰고, 없으면 TMAP 이름 검색(기준점 50km 이내)으로 찾는다.
+     * 후보 목록에 이름이 똑같은 곳이 있으면 그걸 쓰고, 없으면 TMAP 이름 검색(정확도순, 기준점 50km 이내)으로 찾는다.
+     * 이름이 "들어 있는" 곳으로 찾으면 "경복궁" → "경복궁 참치"(식당)처럼 엉뚱한 곳이 잡힌다.
      */
     fun findByName(name: String, lat: Double, lng: Double, pool: Pool): Place? {
         val q = name.trim()
         if (q.length < 2) return null
+        fun norm(s: String) = s.replace(" ", "")
         pool.all()
-            .filter { it.type != PlaceType.LODGING && it.name.length >= 2 }
-            .firstOrNull { it.name.contains(q) || q.contains(it.name) }
+            .filter { it.type != PlaceType.LODGING }
+            .firstOrNull { norm(it.name) == norm(q) }
             ?.let { return it }
 
-        val poi = tmapService.searchPois(q, lat, lng, 5, radiusKm = 0)
-            .firstOrNull { GeoUtil.distanceMeters(lat, lng, it.lat, it.lng) <= MUST_VISIT_RADIUS_M }
-            ?: return null
+        val pois = tmapService.searchPois(q, lat, lng, 10, byAccuracy = true)
+            .filter { GeoUtil.distanceMeters(lat, lng, it.lat, it.lng) <= MUST_VISIT_RADIUS_M }
+            // "경복궁 주차장"·"○○ 정문" 같은 부속 시설은 건너뛴다
+            .filterNot { Regex("주차장|정문|후문|매표소|화장실|입구$|출구$").containsMatchIn(it.name) && !q.contains(it.name) }
+        // 이름이 똑같은 곳 > 정확도 1순위
+        val poi = pois.firstOrNull { norm(it.name) == norm(q) } ?: pois.firstOrNull() ?: return null
         val type = if (Regex("음식|식당|카페|주점|베이커리").containsMatchIn(poi.category)) PlaceType.RESTAURANT
             else PlaceType.ATTRACTION
         return toPlaces(listOf(poi), type).firstOrNull()

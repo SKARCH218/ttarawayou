@@ -238,14 +238,19 @@ class TmapService(@Value("\${tmap.app-key}") appKey: String?) {
      * [radiusKm] 1~33 (km) 또는 0(전국). 거리순 정렬(searchtypCd=R)에서는 반경이 필수 파라미터라
      * 빠지면 TMAP이 400 "필수 파라메터가 없습니다"를 돌려준다.
      */
-    fun searchPois(keyword: String, lat: Double, lng: Double, count: Int, radiusKm: Int = 0): List<Poi> {
+    fun searchPois(
+        keyword: String, lat: Double, lng: Double, count: Int, radiusKm: Int = 0,
+        /** true 면 이름이 잘 맞는 순(A). "경복궁"을 거리순으로 찾으면 가까운 "경복궁 참치"가 먼저 나온다 */
+        byAccuracy: Boolean = false,
+    ): List<Poi> {
         if (!usable()) return emptyList()
         val out = ArrayList<Poi>()
         try {
+            val sort = if (byAccuracy) "A" else "R&radius=${radiusKm.coerceIn(0, 33)}"
             val url = String.format(
                 Locale.US,
-                "%s/tmap/pois?version=1&searchKeyword=%s&centerLon=%f&centerLat=%f&searchtypCd=R&radius=%d&page=1&count=%d",
-                BASE, URLEncoder.encode(keyword, StandardCharsets.UTF_8), lng, lat, radiusKm.coerceIn(0, 33), minOf(20, count),
+                "%s/tmap/pois?version=1&searchKeyword=%s&centerLon=%f&centerLat=%f&searchtypCd=%s&page=1&count=%d",
+                BASE, URLEncoder.encode(keyword, StandardCharsets.UTF_8), lng, lat, sort, minOf(20, count),
             )
             val res = http.get().uri(URI.create(url))
                 .header("appKey", appKey).retrieve().body(String::class.java)

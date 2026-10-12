@@ -43,6 +43,8 @@ object PlanDtos {
         val moods: List<String> = emptyList(),
         val activities: List<String> = emptyList(),
         val spotsPerDay: Int = 3,
+        /** 보기에 없어 여행자가 직접 적은 취향 (예: "루프탑 카페") — 가장 우선 반영 */
+        val customPrefs: List<String> = emptyList(),
         /** AI가 reason 을 쓸 언어 (ko | en | ja | zh) */
         val language: String = "ko",
     ) {

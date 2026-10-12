@@ -97,24 +97,29 @@ class PlanService(
         val userNearAnchor = userInArea && GeoUtil.distanceMeters(
             anchorLat, anchorLng, req.startLatitude!!, req.startLongitude!!,
         ) <= USER_NEAR_ANCHOR_M
-        // 프로필·취향 반영: 걷기 기피 시 산·등산 장소 제외, 선호 키워드·음식 취향 가점
-        val zone = focusZone(
-            applyPreferences(rawPool, req),
-            if (userNearAnchor) req.startLatitude!! else anchorLat,
-            if (userNearAnchor) req.startLongitude!! else anchorLng,
-            days,
-            spotsPerDay,
-        )
-        val pool = zone.pool
-        val areaName = zone.label?.let { "$regionName $it 일대" } ?: regionName
-        log.info("구역 선택 [{}]: 반경 {}m, 숙박 {}, 식당 {}, 관광 {}", areaName, zone.radiusM.toInt(),
-            pool.lodgings.size, pool.restaurants.size, pool.attractions.size)
-
         // 꼭 가고 싶은 곳 — 이름으로 실제 장소를 찾는다 (걷기 기피로 걸러지기 전 원본에서, 최대 5곳)
+        // 여행자가 직접 적은 가장 분명한 요구라, 구역을 고르기 전에 먼저 찾아 구역의 중심으로 삼는다
         val mustNames = req.mustVisit.orEmpty().map { it.trim() }.filter { it.isNotEmpty() }.distinct().take(5)
         val mustFound = mustNames.associateWith { placeProvider.findByName(it, anchorLat, anchorLng, rawPool) }
         val mustPlaces = mustFound.values.filterNotNull().distinctBy { it.id }
         val mustMissing = mustFound.filterValues { it == null }.keys.toList()
+
+        // 프로필·취향 반영: 걷기 기피 시 산·등산 장소 제외, 선호 키워드·음식 취향 가점
+        // 구역 중심: 꼭 가고 싶은 곳 > 지역 안의 내 위치 > 지역 중심
+        val zoneCenter = when {
+            mustPlaces.isNotEmpty() -> mustPlaces.map { it.latitude }.average() to mustPlaces.map { it.longitude }.average()
+            userNearAnchor -> req.startLatitude!! to req.startLongitude!!
+            else -> anchorLat to anchorLng
+        }
+        val zone = focusZone(
+            applyPreferences(rawPool, req), zoneCenter.first, zoneCenter.second, days, spotsPerDay,
+            hotspotSearchM = if (mustPlaces.isNotEmpty()) MUST_HOTSPOT_SEARCH_M else HOTSPOT_SEARCH_M,
+        )
+        val pool = zone.pool
+        val areaName = zone.label?.let { "$regionName $it 일대" } ?: regionName
+        log.info("구역 선택 [{}]: 반경 {}m, 숙박 {}, 식당 {}, 관광 {}{}", areaName, zone.radiusM.toInt(),
+            pool.lodgings.size, pool.restaurants.size, pool.attractions.size,
+            if (mustPlaces.isNotEmpty()) " (꼭 가고 싶은 곳 ${mustPlaces.map { it.name }} 중심)" else "")
 
         // ---------- 1차: 로컬 AI(LM Studio)에게 프로필과 함께 플랜 요청 ----------
         val profile = PlanDtos.TravelProfile(
@@ -133,6 +138,7 @@ class PlanService(
             moods = req.moods.orEmpty(),
             activities = req.activities.orEmpty(),
             spotsPerDay = spotsPerDay,
+            customPrefs = PreferenceKeywords.custom(req),
         )
         // ---------- 동선 최적화: 하루 = 동네 하나 ----------
         // 날마다 볼거리·맛집이 모인 동네 중심(허브)을 정하고, 그날 장소는 그 동네 안에서만 고른다.
@@ -393,17 +399,23 @@ class PlanService(
         val text = "${p.name} ${p.description.orEmpty()} ${p.tags.joinToString(" ")}"
         var bonus = 0.0
         val foods = PreferenceKeywords.foods(req)
+        val custom = PreferenceKeywords.custom(req).toSet()
         for (label in PreferenceKeywords.others(req) + foods) {
             if (label in foods && p.type != PlaceType.RESTAURANT) continue
             val tagged = label in p.tags
             val matched = tagged || (PreferenceKeywords.of(label)?.match?.containsMatchIn(text)
                 ?: (label.length >= 2 && text.contains(label)))  // 직접 입력한 취향
-            if (matched) bonus += if (tagged) 1.2 else 0.6
+            // 직접 적은 취향은 보기에서 고른 취향보다 훨씬 크게 반영한다
+            if (matched) bonus += when {
+                label in custom -> if (tagged) 2.4 else 1.6
+                tagged -> 1.2
+                else -> 0.6
+            }
         }
         bonus += companionBonus(p, text, req.companion)
         req.preferenceNote?.split(Regex("[,·\\s]+"))?.forEach { w ->
             val word = w.trim().trimEnd('요', '.', '!')
-            if (word.length >= 2 && text.contains(word)) bonus += 0.4
+            if (word.length >= 2 && text.contains(word)) bonus += 0.8
         }
         return bonus.coerceIn(-3.0, 3.0)
     }
@@ -676,6 +688,8 @@ class PlanService(
         searchLng: Double,
         days: Int,
         spotsPerDay: Int,
+        /** 핫스팟을 찾는 반경. 꼭 가고 싶은 곳이 중심이면 좁혀서 그 근처를 벗어나지 않게 한다 */
+        hotspotSearchM: Double = HOTSPOT_SEARCH_M,
     ): Zone {
         val spots = pool.attractions + pool.restaurants
         if (spots.isEmpty()) return Zone(pool, searchLat, searchLng, 0.0, null)
@@ -684,7 +698,7 @@ class PlanService(
             GeoUtil.distanceMeters(aLat, aLng, p.latitude, p.longitude)
 
         // 1) 핫스팟: 반경 1.2km 안 장소들의 평점 합이 가장 큰 지점 (기준점에서 멀수록 km당 0.3점 감점)
-        val candidates = spots.filter { dist(searchLat, searchLng, it) <= HOTSPOT_SEARCH_M }.ifEmpty { spots }
+        val candidates = spots.filter { dist(searchLat, searchLng, it) <= hotspotSearchM }.ifEmpty { spots }
         val center = pickVaried(candidates) { c ->
             spots.sumOf { p -> if (dist(c.latitude, c.longitude, p) <= ZONE_RADII.first()) p.rating else 0.0 } -
                 dist(searchLat, searchLng, c) / 1000.0 * 0.3
@@ -1058,6 +1072,7 @@ class PlanService(
         private val DRINKING = Regex("주점|술집|포차|이자카야|호프|펍|와인바|칵테일|bar", RegexOption.IGNORE_CASE)
         // 동선 압축 — 한 구역 집중
         private const val HOTSPOT_SEARCH_M = 4_000.0        // 구역 중심을 찾는 범위 (검색 기준점에서)
+        private const val MUST_HOTSPOT_SEARCH_M = 1_000.0   // 꼭 가고 싶은 곳이 중심일 때는 그 근처에서만
         private val ZONE_RADII = listOf(1_200.0, 1_800.0, 2_500.0, 3_500.0, 5_000.0) // 구역 반경 확장 단계
         private const val LODGING_MIN_RADIUS_M = 3_000.0    // 숙소는 구역보다 조금 넓게 찾는다
         private const val USER_NEAR_ANCHOR_M = 10_000.0     // 사용자가 이 거리 안이면 현재 위치 주변에서 구역 탐색
