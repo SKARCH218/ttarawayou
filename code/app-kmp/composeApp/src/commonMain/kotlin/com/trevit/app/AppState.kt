@@ -128,6 +128,8 @@ class AppState(
     private val prefs: AppPrefs = AppPrefs.None,
     /** 기기 언어 코드 ("ko", "en-US" …) — 저장된 언어가 없을 때 기본값으로 쓴다 */
     systemLanguageCode: String? = null,
+    /** 서버 주소를 비워 저장하면 돌아갈 기본 주소 (에뮬레이터·휴대폰·웹마다 다르다) */
+    private val defaultBaseUrl: String = DEFAULT_BASE_URL,
 ) {
     var baseUrl by mutableStateOf(initialBaseUrl)
         private set
@@ -321,7 +323,7 @@ class AppState(
     private val repository = PlanRepository()
 
     fun saveBaseUrl(url: String) {
-        val cleaned = url.trim().ifBlank { DEFAULT_BASE_URL }
+        val cleaned = url.trim().ifBlank { defaultBaseUrl }
         baseUrl = cleaned
         onBaseUrlSaved(cleaned)
     }
@@ -441,7 +443,11 @@ class AppState(
     }
 
     companion object {
+        /** 에뮬레이터에서 본 이 PC의 로컬 백엔드 */
         const val DEFAULT_BASE_URL = "http://10.0.2.2:8080"
+
+        /** 운영 서버 (실제 휴대폰의 기본값) */
+        const val PRODUCTION_BASE_URL = "http://travit.p-e.kr"
 
         /** 설정 화면 '앱 정보'에 표시 (composeApp versionName 과 맞춘다) */
         const val APP_VERSION = "1.0"

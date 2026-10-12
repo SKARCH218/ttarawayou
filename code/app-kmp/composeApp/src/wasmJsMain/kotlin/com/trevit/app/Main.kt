@@ -52,6 +52,7 @@ fun main() {
             val state = remember {
                 AppState(
                     initialBaseUrl = localStorage.getItem("baseUrl") ?: webDefaultBaseUrl,
+                    defaultBaseUrl = webDefaultBaseUrl,
                     onBaseUrlSaved = { url -> localStorage.setItem("baseUrl", url) },
                     initialAuthToken = localStorage.getItem("authToken"),
                     onAuthTokenSaved = { token ->

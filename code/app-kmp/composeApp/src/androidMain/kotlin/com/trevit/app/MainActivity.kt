@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
 import android.graphics.Color
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
@@ -40,13 +41,16 @@ class MainActivity : ComponentActivity() {
 
 
         val prefs = getSharedPreferences("ttarawayu", Context.MODE_PRIVATE)
-        val initialBaseUrl = prefs.getString("baseUrl", AppState.DEFAULT_BASE_URL)
-            ?: AppState.DEFAULT_BASE_URL
+        // 기본 서버: 에뮬레이터는 이 PC의 로컬 백엔드(10.0.2.2), 실제 휴대폰은 운영 서버.
+        // (예전엔 항상 10.0.2.2 라서 휴대폰에 설치하면 서버에 붙지 못했다) 설정 → 개발자 옵션에서 바꿀 수 있다
+        val defaultBaseUrl = if (isEmulator()) AppState.DEFAULT_BASE_URL else AppState.PRODUCTION_BASE_URL
+        val initialBaseUrl = prefs.getString("baseUrl", defaultBaseUrl) ?: defaultBaseUrl
         val initialAuthToken = prefs.getString("authToken", null)
         setContent {
             val state = remember {
                 AppState(
                     initialBaseUrl = initialBaseUrl,
+                    defaultBaseUrl = defaultBaseUrl,
                     onBaseUrlSaved = { url -> prefs.edit().putString("baseUrl", url).apply() },
                     initialAuthToken = initialAuthToken,
                     // 로그아웃하면 null이 와서 저장된 토큰을 지운다
@@ -85,3 +89,10 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
+
+/** 안드로이드 에뮬레이터에서 도는지 (실제 휴대폰이면 false) */
+private fun isEmulator(): Boolean =
+    Build.FINGERPRINT.startsWith("generic") || Build.FINGERPRINT.contains("emulator") ||
+        Build.MODEL.contains("sdk_gphone") || Build.MODEL.contains("Emulator") ||
+        Build.HARDWARE.contains("ranchu") || Build.HARDWARE.contains("goldfish") ||
+        Build.PRODUCT.contains("sdk")
