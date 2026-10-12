@@ -14,7 +14,10 @@ import com.trevit.shared.PlanRequest
 import com.trevit.shared.PlanResponse
 import com.trevit.shared.WalletProductDto
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
@@ -383,10 +386,11 @@ class AppState(
             // 현재 위치를 먼저 얻어 1일차 출발지로 쓴다 (권한 없거나 실패하면 null → 숙소 출발)
             val loc = withContext(Dispatchers.Default) { getCurrentLocation() }
             val response = withContext(Dispatchers.Default) {
-                repository.createPlan(baseUrl, buildRequest(loc?.first, loc?.second))
+                repository.createPlan(baseUrl, buildRequest(loc?.first, loc?.second), auth.token)
             }
             plan = response
             completedDays = 0
+            startedDays.clear()
             screen = Screen.Result
         } catch (e: CancellationException) {
             throw e
@@ -400,6 +404,7 @@ class AppState(
     fun loadDemoPlan() {
         plan = buildDemoPlan(budget, days, people, region)
         completedDays = 0
+        startedDays.clear()
         errorMessage = null
         screen = Screen.Result
     }
@@ -408,11 +413,31 @@ class AppState(
     fun resetPlan() {
         plan = null
         completedDays = 0
+        startedDays.clear()
         screen = Screen.Setup
     }
 
     fun onDayCompleted(dayIndex: Int) {
-        if (dayIndex + 1 > completedDays) completedDays = dayIndex + 1
+        if (dayIndex + 1 > completedDays) {
+            completedDays = dayIndex + 1
+            track("DAY_COMPLETED")
+        }
+    }
+
+    /** 이번 플랜에서 여정을 시작한 날 — 같은 날을 다시 열어도 한 번만 센다 */
+    private val startedDays = mutableSetOf<Int>()
+
+    fun onJourneyStarted(dayIndex: Int) {
+        if (startedDays.add(dayIndex)) track("JOURNEY_STARTED")
+    }
+
+    /** 지표용 행동 기록 — 백그라운드로 보내고 결과는 기다리지 않는다 (실패해도 무시) */
+    private val eventScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
+    private fun track(type: String) {
+        val url = baseUrl
+        val token = auth.token
+        eventScope.launch { repository.sendEvent(url, type, token) }
     }
 
     companion object {

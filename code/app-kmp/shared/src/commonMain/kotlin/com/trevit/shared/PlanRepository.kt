@@ -5,6 +5,8 @@ import io.ktor.client.call.body
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.request.get
+import io.ktor.client.request.header
+import io.ktor.http.HttpHeaders
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
@@ -21,10 +23,12 @@ class PlanRepository(
      * POST {baseUrl}/api/plan
      * AI 플래닝이 오래 걸릴 수 있어 타임아웃을 넉넉히 잡는다.
      */
-    suspend fun createPlan(baseUrl: String, request: PlanRequest): PlanResponse {
+    suspend fun createPlan(baseUrl: String, request: PlanRequest, authToken: String? = null): PlanResponse {
         val url = baseUrl.trimEnd('/') + "/api/plan"
         val response = client.post(url) {
             contentType(ContentType.Application.Json)
+            // 로그인했으면 토큰을 붙인다 — 서버가 "누가 플랜을 만들었는지" 지표에 남긴다 (없어도 플랜은 만들어진다)
+            authToken?.let { header(HttpHeaders.Authorization, "Bearer $it") }
             setBody(request)
         }
         if (!response.status.isSuccess()) {
@@ -33,6 +37,20 @@ class PlanRepository(
             throw PlanApiException(message ?: "서버 오류 (${response.status.value})")
         }
         return response.body()
+    }
+
+    /**
+     * POST {baseUrl}/api/events — 앱에서만 알 수 있는 행동(여정 시작·하루 완주) 기록.
+     * 지표용이라 실패해도 사용자 흐름을 막지 않는다 (예외를 삼킨다).
+     */
+    suspend fun sendEvent(baseUrl: String, type: String, authToken: String?) {
+        runCatching {
+            client.post(baseUrl.trimEnd('/') + "/api/events") {
+                contentType(ContentType.Application.Json)
+                authToken?.let { header(HttpHeaders.Authorization, "Bearer $it") }
+                setBody(EventRequest(type))
+            }
+        }
     }
 
     /** GET {baseUrl}/api/wallet — 보유 토큰 조회 (웹 설정 화면의 "보유 N 토큰"과 같은 값) */
@@ -78,3 +96,6 @@ class PlanRepository(
 }
 
 class PlanApiException(message: String) : Exception(message)
+
+@kotlinx.serialization.Serializable
+data class EventRequest(val type: String)

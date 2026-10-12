@@ -188,6 +188,8 @@ fun JourneyScreen(state: AppState, dayIndex: Int) {
     LaunchedEffect(completed) {
         if (completed) state.onDayCompleted(dayIndex)
     }
+    // 퍼널 지표: 여정 화면에 들어온 것 = 여정 시작 (같은 날은 한 번만 센다)
+    LaunchedEffect(dayIndex) { state.onJourneyStarted(dayIndex) }
 
     val currentGeom = geoms[legIndex]
     val currentLeg = currentGeom.leg

@@ -1,6 +1,7 @@
 package com.trevit.service
 
 import com.trevit.entity.EmailVerification
+import com.trevit.entity.UserEvent
 import com.trevit.repository.EmailVerificationRepository
 import com.trevit.repository.UserRepository
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder
@@ -19,6 +20,7 @@ class EmailVerificationService(
     private val verifications: EmailVerificationRepository,
     private val users: UserRepository,
     private val mail: MailService,
+    private val metrics: MetricsService,
 ) {
     private val encoder = BCryptPasswordEncoder()
     private val random = SecureRandom()
@@ -50,7 +52,14 @@ class EmailVerificationService(
                 verifiedAt = null,
             )
         )
-        mail.sendVerificationCode(email, code, EmailVerification.CODE_TTL_MINUTES)
+        try {
+            mail.sendVerificationCode(email, code, EmailVerification.CODE_TTL_MINUTES)
+        } catch (e: MailDeliveryException) {
+            // 실패를 지표로 남겨 관리자 대시보드에 바로 보이게 한다 (발송 기록은 롤백돼 바로 재시도 가능)
+            metrics.record(UserEvent.MAIL_FAILED)
+            throw e
+        }
+        if (mail.configured()) metrics.record(UserEvent.MAIL_SENT)
         return EmailVerification.CODE_TTL_MINUTES * 60
     }
 

@@ -14,6 +14,7 @@ import com.trevit.dto.AuthDtos.VerifyCodeRequest
 import com.trevit.service.AuthService
 import com.trevit.service.EmailVerificationService
 import com.trevit.service.GoogleAuthService
+import com.trevit.service.MailDeliveryException
 import com.trevit.service.UnauthorizedException
 import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
@@ -106,6 +107,11 @@ class AuthController(
     @ExceptionHandler(IllegalArgumentException::class)
     fun badRequest(e: IllegalArgumentException): ResponseEntity<Map<String, String>> =
         ResponseEntity.badRequest().body(mapOf("message" to (e.message ?: "잘못된 요청")))
+
+    /** 메일 발송 실패 → 503. 앱은 메시지를 그대로 보여 준다 (예전처럼 조용히 넘어가지 않는다) */
+    @ExceptionHandler(MailDeliveryException::class)
+    fun mailFailed(e: MailDeliveryException): ResponseEntity<Map<String, String>> =
+        ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(mapOf("message" to (e.message ?: "인증 메일을 보내지 못했어요.")))
 
     /** 인증 실패 → 401 */
     @ExceptionHandler(UnauthorizedException::class)

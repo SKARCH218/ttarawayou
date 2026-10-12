@@ -9,6 +9,7 @@ import com.trevit.dto.AuthDtos.SignupRequest
 import com.trevit.dto.AuthDtos.UserResponse
 import com.trevit.entity.AuthToken
 import com.trevit.entity.User
+import com.trevit.entity.UserEvent
 import com.trevit.repository.AuthTokenRepository
 import com.trevit.repository.UserRepository
 import org.springframework.beans.factory.annotation.Value
@@ -37,6 +38,7 @@ class AuthService(
     private val emailVerification: EmailVerificationService,
     private val google: GoogleAuthService,
     @Value("\${trevit.invite-code:}") private val inviteCode: String,
+    private val metrics: MetricsService,
 ) {
     private val encoder = BCryptPasswordEncoder()
     private val random = SecureRandom()
@@ -78,6 +80,7 @@ class AuthService(
                 provider = User.Provider.LOCAL,
             )
         )
+        metrics.record(UserEvent.SIGNUP, user.id)
         return AuthResponse(issueToken(user), user.toResponse())
     }
 
@@ -107,6 +110,7 @@ class AuthService(
                 )
             )
         }
+        metrics.record(if (existing != null) UserEvent.LOGIN else UserEvent.SIGNUP, user.id)
         return AuthResponse(issueToken(user), user.toResponse())
     }
 
@@ -132,6 +136,7 @@ class AuthService(
         if (user == null || !encoder.matches(req.password, user.passwordHash)) {
             throw UnauthorizedException("이메일 또는 비밀번호가 올바르지 않아요.")
         }
+        metrics.record(UserEvent.LOGIN, user.id)
         return AuthResponse(issueToken(user), user.toResponse())
     }
 
@@ -147,7 +152,18 @@ class AuthService(
 
         val user = users.findById(token.userId).orElse(null)
             ?: throw UnauthorizedException("탈퇴했거나 없는 계정이에요.")
+        // 앱은 켤 때마다 /me 로 로그인 상태를 확인한다 → 그날 앱을 쓴 것으로 센다 (하루 한 번)
+        user.id?.let { metrics.recordActive(it) }
         return user.toResponse()
+    }
+
+    /** 로그인했으면 회원 번호, 아니면 null (지표 기록용 — 로그인이 필수가 아닌 API에서 쓴다) */
+    @Transactional(readOnly = true)
+    fun userIdOrNull(authorization: String?): Long? {
+        val raw = authorization?.removePrefix("Bearer ")?.trim().orEmpty()
+        if (raw.isEmpty()) return null
+        val token = tokens.findById(raw).orElse(null) ?: return null
+        return token.userId.takeUnless { token.isExpired() }
     }
 
     /** 해당 토큰만 폐기 — 다른 기기의 로그인은 유지된다 */

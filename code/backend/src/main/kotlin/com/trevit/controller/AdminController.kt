@@ -2,6 +2,7 @@ package com.trevit.controller
 
 import com.trevit.dto.AdminDtos.SetWalletRequest
 import com.trevit.service.AdminService
+import com.trevit.service.MetricsService
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.ExceptionHandler
@@ -15,11 +16,15 @@ import org.springframework.web.bind.annotation.RestController
 /** 접근 제어는 AdminAuthInterceptor 가 X-Admin-Token 헤더로 처리한다 (여기선 신경 안 씀) */
 @RestController
 @RequestMapping("/api/admin")
-class AdminController(private val admin: AdminService) {
+class AdminController(private val admin: AdminService, private val metrics: MetricsService) {
 
     /** GET /api/admin/status — DB·LLM 연결 상태, 외부 연동 설정 여부, 지갑·통계 */
     @GetMapping("/status")
     fun status() = admin.status()
+
+    /** GET /api/admin/metrics — 실측 대시보드: 일별 추이·퍼널·리텐션·메일 발송 상태 */
+    @GetMapping("/metrics")
+    fun metrics() = metrics.dashboard()
 
     /** GET /api/admin/users — 가입자 목록 (비밀번호 해시는 내려주지 않음) */
     @GetMapping("/users")

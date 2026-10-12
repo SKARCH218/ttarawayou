@@ -5,6 +5,7 @@ import com.trevit.entity.EmailVerification
 import com.trevit.entity.Place
 import com.trevit.entity.RouteCache
 import com.trevit.entity.User
+import com.trevit.entity.UserEvent
 import com.trevit.entity.Wallet
 import org.springframework.data.jpa.repository.JpaRepository
 
@@ -28,3 +29,9 @@ interface AuthTokenRepository : JpaRepository<AuthToken, String> {
 }
 
 interface RouteCacheRepository : JpaRepository<RouteCache, String>
+
+interface UserEventRepository : JpaRepository<UserEvent, Long> {
+    fun findByCreatedAtAfter(after: java.time.Instant): List<UserEvent>
+    fun findFirstByOrderByCreatedAtAsc(): UserEvent?
+    fun findFirstByTypeOrderByCreatedAtDesc(type: String): UserEvent?
+}

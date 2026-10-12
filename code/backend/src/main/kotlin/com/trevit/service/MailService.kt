@@ -22,7 +22,12 @@ class MailService(
 
     fun configured(): Boolean = host.isNotBlank() && senderProvider.ifAvailable != null
 
-    /** 인증코드 메일. 실패해도 예외를 던지지 않고 로그 폴백으로 넘어간다 */
+    /**
+     * 인증코드 메일.
+     * - SMTP 미설정(개발·시연): 코드를 서버 로그에 찍는다
+     * - SMTP 설정됨 + 발송 실패: [MailDeliveryException] 을 던진다.
+     *   예전엔 실패해도 로그만 남기고 "보냈다"고 응답해서, 메일이 9일간 안 나가는 걸 아무도 몰랐다.
+     */
     fun sendVerificationCode(email: String, code: String, ttlMinutes: Long) {
         val sender = if (host.isNotBlank()) senderProvider.ifAvailable else null
         if (sender == null) {
@@ -49,8 +54,11 @@ class MailService(
             )
             log.info("인증코드 메일 발송 완료 — {}", maskEmail(email))
         } catch (e: Exception) {
-            log.warn("인증코드 메일 발송 실패 — {} ({}), 로그 폴백", maskEmail(email), e.message)
-            logFallback(email, code)
+            // ERROR 로 남겨 로그 모니터링에 걸리게 하고, 사용자에게도 실패를 그대로 알린다
+            log.error("인증코드 메일 발송 실패 — {} ({})", maskEmail(email), e.message)
+            throw MailDeliveryException(
+                "인증 메일을 보내지 못했어요. 잠시 후 다시 시도하거나, 초대코드가 있으면 초대코드로 가입해 주세요.", e,
+            )
         }
     }
 
@@ -65,3 +73,6 @@ class MailService(
         return email.first() + "***" + email.substring(at)
     }
 }
+
+/** SMTP 로 메일을 보내지 못함 → 503 + 사용자에게 보여줄 메시지 */
+class MailDeliveryException(message: String, cause: Throwable? = null) : RuntimeException(message, cause)

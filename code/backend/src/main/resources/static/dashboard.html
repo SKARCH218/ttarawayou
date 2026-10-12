@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>트레빗 실측 대시보드</title>
+<style>
+  :root {
+    --bg: #f5f7fb; --card: #ffffff; --ink: #0d1220; --body: #404a63; --mute: #7c86a0; --line: #e4e8f3;
+    --brand: #03B083; --brand-soft: #d6f3ea; --red: #D64545; --red-soft: #fbe0e0; --amber: #C9820A;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0B0F1A; --card: #141927; --ink: #EEF2FA; --body: #B4BED3; --mute: #7F8AA6; --line: #262D40;
+      --brand: #12C796; --brand-soft: rgba(18,199,150,.16); --red: #FF6B6B; --red-soft: rgba(255,107,107,.16); --amber: #F5B743;
+    }
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--ink); font-family: "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+    line-height: 1.5; padding: 24px 16px 60px; }
+  main { max-width: 1080px; margin: 0 auto; }
+  h1 { font-size: 26px; letter-spacing: -.02em; }
+  h2 { font-size: 17px; margin-bottom: 12px; }
+  .sub { color: var(--mute); font-size: 13px; margin-top: 4px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 20px; margin-top: 16px; }
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-top: 16px; }
+  .kpi { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px; }
+  .kpi .v { font-size: 30px; font-weight: 800; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+  .kpi .l { color: var(--mute); font-size: 13px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 760px) { .grid2 { grid-template-columns: 1fr; } }
+  .grid2 .card { margin-top: 16px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
+  th, td { padding: 7px 8px; border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap; }
+  th:first-child, td:first-child { text-align: left; }
+  th { color: var(--mute); font-weight: 600; }
+  .scroll { overflow-x: auto; }
+  .bar { height: 26px; background: var(--brand-soft); border-radius: 8px; position: relative; overflow: hidden; margin: 6px 0 2px; }
+  .bar i { position: absolute; inset: 0 auto 0 0; background: var(--brand); border-radius: 8px; }
+  .fstep { margin-bottom: 12px; }
+  .fstep .top { display: flex; justify-content: space-between; font-size: 14px; }
+  .fstep .top b { font-variant-numeric: tabular-nums; }
+  .fstep .rate { color: var(--mute); font-size: 12px; }
+  .alert { border-radius: 12px; padding: 12px 14px; font-size: 14px; margin-top: 10px; }
+  .alert.bad { background: var(--red-soft); color: var(--red); font-weight: 700; }
+  .alert.ok { background: var(--brand-soft); color: var(--brand); font-weight: 700; }
+  .alert.warn { background: rgba(201,130,10,.14); color: var(--amber); font-weight: 700; }
+  dl { font-size: 13px; color: var(--body); }
+  dt { font-weight: 700; color: var(--ink); margin-top: 8px; }
+  .login { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
+  input { flex: 1; min-width: 200px; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--card); color: var(--ink); font-size: 14px; }
+  button { padding: 10px 16px; border-radius: 10px; border: 0; background: var(--brand); color: #fff; font-weight: 700; cursor: pointer; font-size: 14px; }
+  .err { color: var(--red); margin-top: 10px; font-size: 14px; }
+  svg text { fill: var(--mute); font-size: 11px; }
+  .cell-null { color: var(--mute); }
+  .heat { border-radius: 6px; padding: 2px 6px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>트레빗 실측 대시보드</h1>
+  <p class="sub" id="meta">관리자 토큰(ADMIN_TOKEN)을 입력하면 서버의 실제 기록으로 지표를 계산합니다.</p>
+
+  <div class="login" id="login">
+    <input id="token" type="password" placeholder="관리자 토큰" autocomplete="off">
+    <button id="go">불러오기</button>
+  </div>
+  <p class="err" id="err"></p>
+
+  <div id="app" hidden>
+    <div class="kpis" id="kpis"></div>
+
+    <div class="card">
+      <h2>메일 발송 상태</h2>
+      <div id="mail"></div>
+    </div>
+
+    <div class="grid2">
+      <div class="card">
+        <h2>퍼널</h2>
+        <p class="sub" id="funnelBase" style="margin:-6px 0 12px"></p>
+        <div id="funnel"></div>
+      </div>
+      <div class="card">
+        <h2>리텐션 커브 (Day 0 ~ 14)</h2>
+        <p class="sub" style="margin:-6px 0 8px">가입일 기준 N일째에 다시 활동한 회원 비율 (최근 28일 가입자)</p>
+        <div id="curve"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>일별 추이 (최근 14일)</h2>
+      <div id="dailyChart"></div>
+      <div class="scroll"><table id="daily"></table></div>
+    </div>
+
+    <div class="card">
+      <h2>가입 코호트별 리텐션</h2>
+      <p class="sub" style="margin:-6px 0 12px" id="cohortNote"></p>
+      <div class="scroll"><table id="cohorts"></table></div>
+    </div>
+
+    <div class="card">
+      <h2>지표 정의</h2>
+      <dl>
+        <dt>활성 사용자</dt><dd>그날 가입·로그인·앱 열기(로그인 상태)·플랜 생성·여정 시작·하루 완주 중 하나라도 한 회원 (한국 시간 기준 하루)</dd>
+        <dt>퍼널</dt><dd>가입 → 첫 플랜 생성 → 여정 시작(지도 따라가기) → 하루 완주 → 재방문(가입 다음 날 이후 다시 활동). 각 단계는 그 행동을 한 번이라도 한 회원 수</dd>
+        <dt>Day-N 리텐션</dt><dd>가입한 날을 Day 0으로 두고, N일째 되는 날 활동한 회원 ÷ 그날까지 시간이 지난 가입자</dd>
+        <dt>북극성 지표</dt><dd>주간 여정 시작 수 — "AI가 짜 준 비밀 여행을 실제로 떠났다"는 핵심 가치가 전달된 횟수</dd>
+        <dt>기록 범위</dt><dd>행동 기록은 이 기능을 배포한 시점부터 쌓입니다. 그 전에 가입한 회원은 가입일만 알 수 있어 퍼널·리텐션 계산에서 제외합니다.</dd>
+      </dl>
+    </div>
+  </div>
+</main>
+<script>
+  const $ = id => document.getElementById(id);
+  const pct = v => v == null ? "–" : (v * 100).toFixed(v >= 0.1 || v === 0 ? 0 : 1) + "%";
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  const kst = iso => iso ? new Date(iso).toLocaleString("ko-KR", { timeZone: "Asia/Seoul" }) : "없음";
+  const md = d => d.slice(5).replace("-", "/");
+
+  let token = "";
+  try { token = sessionStorage.getItem("adminToken") || ""; } catch (e) {}
+  $("token").value = token;
+  $("go").onclick = () => { token = $("token").value.trim(); try { sessionStorage.setItem("adminToken", token); } catch (e) {} load(); };
+  $("token").onkeydown = e => { if (e.key === "Enter") $("go").click(); };
+  if (token) load();
+
+  async function load() {
+    $("err").textContent = "";
+    try {
+      const res = await fetch("/api/admin/metrics", { headers: { "X-Admin-Token": token } });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.message || ("오류 " + res.status));
+      render(body);
+      $("app").hidden = false;
+      $("login").hidden = true;
+    } catch (e) {
+      $("err").textContent = e.message;
+    }
+  }
+
+  function render(m) {
+    $("meta").textContent = "계산 시각 " + kst(m.generatedAt) + " · 행동 기록 시작 " + kst(m.trackingSince);
+    const t = m.totals;
+    $("kpis").innerHTML = [
+      ["전체 회원", t.users], ["최근 7일 가입", t.signups7d], ["오늘 활성", t.activeToday],
+      ["7일 활성(WAU)", t.active7d], ["7일 플랜 생성", t.plans7d], ["7일 여정 시작 ★", t.journeys7d],
+    ].map(([l, v]) => `<div class="kpi"><div class="v">${v}</div><div class="l">${l}</div></div>`).join("");
+
+    // 메일: 실패가 있으면 빨간 경고 — "조용한 실패"를 화면에서 바로 보이게
+    const ml = m.mail;
+    let cls = "ok", msg = "정상 — 최근 7일 발송 " + ml.sent7d + "건, 실패 0건";
+    if (!ml.configured) { cls = "warn"; msg = "SMTP 미설정 — 인증 메일이 실제로 나가지 않습니다 (코드는 서버 로그에만 기록). 초대코드 가입만 가능합니다."; }
+    else if (ml.failed7d > 0) { cls = "bad"; msg = "⚠ 최근 7일 메일 발송 실패 " + ml.failed7d + "건 (성공 " + ml.sent7d + "건) — 사용자가 인증번호를 못 받고 있습니다"; }
+    $("mail").innerHTML = `<div class="alert ${cls}">${esc(msg)}</div>
+      <p class="sub" style="margin-top:8px">마지막 성공 ${kst(ml.lastSentAt)} · 마지막 실패 ${kst(ml.lastFailedAt)}</p>`;
+
+    $("funnelBase").textContent = "대상: " + m.funnelBase;
+    const top = Math.max(1, m.funnel[0]?.users || 0);
+    $("funnel").innerHTML = m.funnel.map((s, i) => `<div class="fstep">
+        <div class="top"><span>${i + 1}. ${esc(s.label)}</span><b>${s.users}명</b></div>
+        <div class="bar"><i style="width:${(s.users / top * 100).toFixed(1)}%"></i></div>
+        <div class="rate">${i === 0 ? "기준" : "처음 대비 " + pct(s.fromStart) + " · 이전 단계 대비 " + pct(s.fromPrev)}</div>
+      </div>`).join("");
+
+    $("curve").innerHTML = lineChart(m.retention.curve.map(p => ({ x: "D" + p.day, y: p.rate, n: p.eligible })), true);
+
+    const d = m.daily;
+    $("dailyChart").innerHTML = barChart(d.map(r => ({ x: md(r.date), y: r.activeUsers })), "활성 사용자");
+    $("daily").innerHTML = "<tr><th>날짜</th><th>가입</th><th>활성</th><th>플랜</th><th>여정 시작</th><th>메일 성공</th><th>메일 실패</th></tr>" +
+      d.slice().reverse().map(r => `<tr><td>${r.date}</td><td>${r.signups}</td><td>${r.activeUsers}</td><td>${r.plans}</td>
+        <td>${r.journeys}</td><td>${r.mailSent}</td><td style="${r.mailFailed ? "color:var(--red);font-weight:700" : ""}">${r.mailFailed}</td></tr>`).join("");
+
+    const R = m.retention;
+    $("cohortNote").textContent = `기록이 있는 가입자 ${R.tracked}명 기준 (기록 시작 전 가입자 ${R.untracked}명은 제외)`;
+    $("cohorts").innerHTML = "<tr><th>가입일</th><th>인원</th>" + R.days.map(n => `<th>D${n}</th>`).join("") + "</tr>" +
+      (R.cohorts.length ? R.cohorts.map(c => `<tr><td>${c.date}</td><td>${c.size}</td>` + c.days.map(v => v == null
+        ? `<td class="cell-null">·</td>`
+        : `<td><span class="heat" style="background:rgba(3,176,131,${(0.08 + v * 0.6).toFixed(2)})">${pct(v)}</span></td>`).join("") + "</tr>").join("")
+        : `<tr><td colspan="${R.days.length + 2}" class="cell-null">아직 기록이 있는 가입자가 없습니다</td></tr>`);
+  }
+
+  // 의존성 없는 작은 SVG 차트
+  function lineChart(pts, asPct) {
+    const W = 460, H = 200, L = 34, B = 24, T = 10, Rr = 8;
+    const xs = i => L + i * (W - L - Rr) / Math.max(1, pts.length - 1);
+    const ys = v => T + (1 - v) * (H - T - B);
+    let g = "";
+    [0, .25, .5, .75, 1].forEach(v => { g += `<line x1="${L}" x2="${W - Rr}" y1="${ys(v)}" y2="${ys(v)}" stroke="var(--line)"/><text x="${L - 6}" y="${ys(v) + 4}" text-anchor="end">${v * 100}%</text>`; });
+    const valid = pts.map((p, i) => [i, p]).filter(([, p]) => p.y != null);
+    const path = valid.map(([i, p], k) => (k ? "L" : "M") + xs(i).toFixed(1) + " " + ys(p.y).toFixed(1)).join(" ");
+    pts.forEach((p, i) => { if (i % 2 === 0) g += `<text x="${xs(i)}" y="${H - 6}" text-anchor="middle">${p.x}</text>`; });
+    const dots = valid.map(([i, p]) => `<circle cx="${xs(i)}" cy="${ys(p.y)}" r="3.5" fill="var(--brand)"><title>${p.x}: ${pct(p.y)} (대상 ${p.n}명)</title></circle>`).join("");
+    const empty = valid.length ? "" : `<text x="${W / 2}" y="${H / 2}" text-anchor="middle">아직 데이터가 없습니다</text>`;
+    return `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="리텐션 커브">${g}<path d="${path}" fill="none" stroke="var(--brand)" stroke-width="2.5"/>${dots}${empty}</svg>`;
+  }
+  function barChart(pts, label) {
+    const W = 1000, H = 160, L = 30, B = 22, T = 10;
+    const max = Math.max(1, ...pts.map(p => p.y));
+    const bw = (W - L) / pts.length;
+    let g = `<line x1="${L}" x2="${W}" y1="${H - B}" y2="${H - B}" stroke="var(--line)"/><text x="${L - 6}" y="${T + 8}" text-anchor="end">${max}</text>`;
+    pts.forEach((p, i) => {
+      const h = p.y / max * (H - T - B), x = L + i * bw + bw * 0.18;
+      g += `<rect x="${x}" y="${H - B - h}" width="${bw * 0.64}" height="${h}" rx="4" fill="var(--brand)"><title>${p.x} ${label} ${p.y}명</title></rect>`;
+      g += `<text x="${x + bw * 0.32}" y="${H - 6}" text-anchor="middle">${p.x}</text>`;
+    });
+    return `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="${label}">${g}</svg>`;
+  }
+</script>
+</body>
+</html>
