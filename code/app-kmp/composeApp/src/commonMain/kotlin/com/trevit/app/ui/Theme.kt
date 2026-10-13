@@ -81,6 +81,24 @@ val TossFaceFontFamily: FontFamily
 // 본문은 시스템 폰트(한글 최적화)를 그대로 쓴다
 private val AppTypography: Typography = Typography()
 
+/**
+ * 웹(스키아)에서 일본어·중국어일 때 본문 기본 글꼴로 쓸 한자 폰트 (안드로이드·한국어·영어는 null).
+ * 한자 폰트를 "대체 글꼴"로만 등록하면, 폰트를 받기 전에 그려진 □가 글자 그리기 캐시에 남아
+ * 언어를 바꿔도 계속 깨져 보였다. 기본 글꼴 자체를 바꾸면 모든 글자를 새로 그린다.
+ */
+val LocalCjkFontFamily = compositionLocalOf<FontFamily?> { null }
+
+private fun Typography.withFamily(f: FontFamily) = Typography(
+    displayLarge = displayLarge.copy(fontFamily = f), displayMedium = displayMedium.copy(fontFamily = f),
+    displaySmall = displaySmall.copy(fontFamily = f), headlineLarge = headlineLarge.copy(fontFamily = f),
+    headlineMedium = headlineMedium.copy(fontFamily = f), headlineSmall = headlineSmall.copy(fontFamily = f),
+    titleLarge = titleLarge.copy(fontFamily = f), titleMedium = titleMedium.copy(fontFamily = f),
+    titleSmall = titleSmall.copy(fontFamily = f), bodyLarge = bodyLarge.copy(fontFamily = f),
+    bodyMedium = bodyMedium.copy(fontFamily = f), bodySmall = bodySmall.copy(fontFamily = f),
+    labelLarge = labelLarge.copy(fontFamily = f), labelMedium = labelMedium.copy(fontFamily = f),
+    labelSmall = labelSmall.copy(fontFamily = f),
+)
+
 /** 트레빗 브랜드 민트 — design-system/brand 로고와 동일한 값 */
 val BrandMint = Color(0xFF03B083)
 
@@ -117,10 +135,11 @@ fun TrevitTheme(mode: ThemeMode = ThemeMode.SYSTEM, content: @Composable () -> U
         ThemeMode.LIGHT -> false
         ThemeMode.DARK -> true
     }
+    val cjk = LocalCjkFontFamily.current
     CompositionLocalProvider(LocalDarkTheme provides dark) {
         MaterialTheme(
             colorScheme = if (dark) DarkColors else LightColors,
-            typography = AppTypography,
+            typography = if (cjk == null) AppTypography else AppTypography.withFamily(cjk),
             content = content,
         )
     }
