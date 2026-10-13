@@ -50,6 +50,9 @@ fun LoginScreen(state: AppState) {
 
         LoginCard(state, passwordVisible) { passwordVisible = !passwordVisible }
 
+        // 비밀번호 찾기를 마치고 돌아왔으면 안내
+        if (auth.resetDone) FieldHint(tr("auth.reset.done"), isOk = true)
+
         auth.errorMessage?.let { ErrorBox(it) }
 
         Spacer(Modifier.height(16.dp))
@@ -58,7 +61,10 @@ fun LoginScreen(state: AppState) {
             enabled = !auth.busy,
             onClick = {
                 scope.launch {
-                    if (auth.login()) state.screen = Screen.Setup
+                    if (auth.login()) {
+                        auth.resetDone = false
+                        state.screen = Screen.Setup
+                    }
                 }
             },
             modifier = Modifier.fillMaxWidth(),
@@ -66,7 +72,14 @@ fun LoginScreen(state: AppState) {
 
         AuthSwitchRow(tr("auth.login.noAccount"), tr("auth.login.toSignup")) {
             auth.errorMessage = null
+            auth.resetDone = false
             state.screen = Screen.Signup
+        }
+        AuthSwitchRow(tr("auth.login.forgot"), tr("auth.login.toReset")) {
+            auth.clearResetForm()
+            auth.resetEmail = auth.loginEmail.trim()   // 적어 둔 이메일을 그대로 가져간다
+            auth.resetDone = false
+            state.screen = Screen.PasswordReset
         }
     }
 }

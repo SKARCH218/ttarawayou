@@ -34,6 +34,21 @@ class AuthRepository(
         }.requireSuccess()
     }
 
+    /** 비밀번호 찾기 인증코드 발송 → 유효시간(초). 가입 여부와 관계없이 같은 응답이 온다 */
+    suspend fun sendResetCode(baseUrl: String, email: String): Long =
+        client.post(url(baseUrl, "/api/auth/password/reset/send")) {
+            contentType(ContentType.Application.Json)
+            setBody(SendCodeRequest(email))
+        }.require<SendCodeResponse>().expiresInSeconds
+
+    /** 인증번호 + 새 비밀번호로 재설정 (서버는 모든 기기에서 로그아웃시킨다) */
+    suspend fun resetPassword(baseUrl: String, email: String, code: String, newPassword: String) {
+        client.post(url(baseUrl, "/api/auth/password/reset")) {
+            contentType(ContentType.Application.Json)
+            setBody(ResetPasswordRequest(email, code, newPassword))
+        }.requireSuccess()
+    }
+
     suspend fun signup(baseUrl: String, request: SignupRequest): AuthResponse =
         client.post(url(baseUrl, "/api/auth/signup")) {
             contentType(ContentType.Application.Json)

@@ -7,6 +7,7 @@ import com.trevit.dto.AuthDtos.ChangePasswordRequest
 import com.trevit.dto.AuthDtos.WithdrawRequest
 import com.trevit.dto.AuthDtos.GoogleLoginRequest
 import com.trevit.dto.AuthDtos.LoginRequest
+import com.trevit.dto.AuthDtos.ResetPasswordRequest
 import com.trevit.dto.AuthDtos.SendCodeRequest
 import com.trevit.dto.AuthDtos.SignupRequest
 import com.trevit.dto.AuthDtos.UserResponse
@@ -49,6 +50,18 @@ class AuthController(
     fun verifyCode(@RequestBody request: VerifyCodeRequest): Map<String, Boolean> {
         emailVerification.verifyCode(request.email, request.code)
         return mapOf("verified" to true)
+    }
+
+    /** POST /api/auth/password/reset/send — 비밀번호 찾기 인증코드 (가입 여부와 관계없이 같은 응답) */
+    @PostMapping("/password/reset/send")
+    fun sendResetCode(@RequestBody request: SendCodeRequest): Map<String, Long> =
+        mapOf("expiresInSeconds" to emailVerification.sendResetCode(request.email))
+
+    /** POST /api/auth/password/reset — 인증번호 확인 + 새 비밀번호 설정 (모든 기기 로그아웃) */
+    @PostMapping("/password/reset")
+    fun resetPassword(@RequestBody request: ResetPasswordRequest): Map<String, Boolean> {
+        authService.resetPassword(request)
+        return mapOf("ok" to true)
     }
 
     /** POST /api/auth/signup — 메일 인증을 마친 이메일만 가입된다 */

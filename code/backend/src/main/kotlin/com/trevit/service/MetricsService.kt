@@ -76,7 +76,7 @@ class MetricsService(
     )
 
     fun dashboard(now: Instant = Instant.now()): Dashboard {
-        val today = LocalDate.now(KST)
+        val today = now.atZone(KST).toLocalDate()   // 기준 시각에서 날짜를 뽑는다 (테스트·재계산이 실제 날짜에 흔들리지 않게)
         val since = now.minus(Duration.ofDays(WINDOW_DAYS))
         val recent = events.findByCreatedAtAfter(since)
         val allUsers = users.findAll()

@@ -28,6 +28,7 @@ sealed interface Screen {
     data object Intro : Screen        // 브랜드 인트로(스플래시)
     data object Login : Screen        // 로그인 (웹 login.html)
     data object Signup : Screen       // 회원가입 + 메일 인증 (웹 signup.html)
+    data object PasswordReset : Screen // 비밀번호 찾기 (메일 인증번호 → 새 비밀번호)
     data object Setup : Screen        // 여행 설정: 지역/예산/기간/인원
     data object Profile : Screen      // 취향 질문: 한 질문씩 넘기는 설문
     data object Generating : Screen   // 생성 중

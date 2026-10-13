@@ -45,6 +45,13 @@ object AuthDtos {
         val newPassword: String = "",
     )
 
+    /** 비밀번호 찾기 — 메일로 받은 인증번호 + 새 비밀번호 */
+    data class ResetPasswordRequest(
+        val email: String = "",
+        val code: String = "",
+        val newPassword: String = "",
+    )
+
     /** 닉네임 변경 요청 (설정 화면) */
     data class ChangeNicknameRequest(val nickname: String = "")
 

@@ -24,6 +24,39 @@ internal val authStrings: Map<String, List<String>> = mapOf(
     "auth.login.button" to listOf("로그인", "Log in", "ログイン", "登录"),
     "auth.login.noAccount" to listOf("아직 계정이 없나요?", "Don't have an account?", "アカウントをお持ちでないですか？", "还没有账号？"),
     "auth.login.toSignup" to listOf("회원가입", "Sign up", "新規登録", "注册"),
+    "auth.login.forgot" to listOf("비밀번호가 기억나지 않나요?", "Forgot your password?", "パスワードをお忘れですか？", "忘记密码了？"),
+    "auth.login.toReset" to listOf("비밀번호 찾기", "Reset password", "パスワード再設定", "找回密码"),
+
+    // ---- 비밀번호 찾기 ----
+    "auth.reset.title" to listOf("비밀번호 찾기", "Reset your password", "パスワード再設定", "找回密码"),
+    "auth.reset.subtitle" to listOf(
+        "가입한 이메일로 인증번호를 보내 드려요",
+        "We'll send a code to the email you signed up with",
+        "登録したメールアドレスに認証コードを送ります",
+        "我们会向你注册的邮箱发送验证码",
+    ),
+    "auth.reset.emailHint" to listOf(
+        "가입할 때 쓴 이메일을 입력해 주세요",
+        "Enter the email you used to sign up",
+        "登録時のメールアドレスを入力してください",
+        "请输入注册时使用的邮箱",
+    ),
+    "auth.reset.sentHint" to listOf(
+        "가입된 이메일이라면 인증번호가 도착해요. 메일이 안 보이면 스팸함도 확인해 주세요",
+        "If this email is registered, a code is on its way. Check your spam folder too",
+        "登録済みのメールアドレスなら認証コードが届きます。迷惑メールフォルダも確認してください",
+        "如果该邮箱已注册，验证码即将送达。也请检查垃圾邮件文件夹",
+    ),
+    "auth.reset.newPassword" to listOf("새 비밀번호", "New password", "新しいパスワード", "新密码"),
+    "auth.reset.button" to listOf("비밀번호 변경", "Change password", "パスワードを変更", "修改密码"),
+    "auth.reset.busy" to listOf("변경 중…", "Changing…", "変更中…", "修改中…"),
+    "auth.reset.remembered" to listOf("비밀번호가 생각났나요?", "Remembered it?", "思い出しましたか？", "想起来了？"),
+    "auth.reset.done" to listOf(
+        "비밀번호를 바꿨어요. 새 비밀번호로 로그인해 주세요",
+        "Password changed. Log in with your new password",
+        "パスワードを変更しました。新しいパスワードでログインしてください",
+        "密码已修改，请使用新密码登录",
+    ),
 
     // ---- 회원가입 ----
     "auth.signup.title" to listOf("떠날 준비 되셨나요?", "Ready to go?", "出発の準備はできましたか？", "准备好出发了吗？"),
@@ -164,6 +197,7 @@ internal val authStrings: Map<String, List<String>> = mapOf(
     "auth.action.login" to listOf("로그인", "Login", "ログイン", "登录"),
     "auth.action.sendCode" to listOf("인증코드 발송", "Sending the code", "認証コードの送信", "发送验证码"),
     "auth.action.signup" to listOf("회원가입", "Sign-up", "会員登録", "注册"),
+    "auth.action.reset" to listOf("비밀번호 변경", "Password reset", "パスワード変更", "修改密码"),
 
     // ---- 서버 문구 (AuthService · EmailVerificationService · GoogleAuthService · AuthController) ----
     "srv.이메일을 입력해 주세요." to listOf("이메일을 입력해 주세요.", "Please enter your email.", "メールアドレスを入力してください。", "请输入邮箱。"),
@@ -261,6 +295,12 @@ internal val authStrings: Map<String, List<String>> = mapOf(
         "Couldn't read your Google account info.",
         "Googleアカウント情報を読み取れませんでした。",
         "无法读取 Google 账号信息。",
+    ),
+    "srv.인증 메일을 보내지 못했어요. 잠시 후 다시 시도하거나, 초대코드가 있으면 초대코드로 가입해 주세요." to listOf(
+        "인증 메일을 보내지 못했어요. 잠시 후 다시 시도하거나, 초대코드가 있으면 초대코드로 가입해 주세요.",
+        "We couldn't send the verification email. Try again shortly, or sign up with an invite code if you have one.",
+        "認証メールを送信できませんでした。しばらくしてから再度お試しいただくか、招待コードがあれば招待コードで登録してください。",
+        "无法发送验证邮件。请稍后重试，或如有邀请码请使用邀请码注册。",
     ),
     "srv.먼저 인증번호를 받아 주세요." to listOf(
         "먼저 인증번호를 받아 주세요.",

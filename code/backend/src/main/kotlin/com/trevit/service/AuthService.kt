@@ -186,6 +186,24 @@ class AuthService(
         users.save(user)
     }
 
+    /**
+     * 비밀번호 찾기 — 메일로 받은 인증번호가 맞으면 새 비밀번호로 바꾸고, 모든 기기에서 로그아웃시킨다.
+     * noRollbackFor: 인증번호가 틀렸을 때 늘린 시도 횟수가 롤백되면 무차별 대입을 막지 못한다.
+     */
+    @Transactional(noRollbackFor = [IllegalArgumentException::class])
+    fun resetPassword(req: com.trevit.dto.AuthDtos.ResetPasswordRequest) {
+        val email = req.email.trim().lowercase()
+        validatePassword(req.newPassword)          // 비밀번호 형식 오류로 시도 횟수를 깎지 않도록 먼저 검사
+        emailVerification.verifyCode(email, req.code)
+        emailVerification.consumeVerified(email)
+        val user = users.findByEmail(email)
+            ?: throw IllegalArgumentException("먼저 인증번호를 받아 주세요.")
+        user.passwordHash = encoder.encode(req.newPassword)
+        users.save(user)
+        tokens.deleteByUserId(user.id!!)            // 잃어버린 기기에 남은 로그인도 끊는다
+        metrics.record(UserEvent.PASSWORD_RESET, user.id)
+    }
+
     /** 닉네임 변경 — 가입 때와 같은 규칙(2~12자, 중복 불가) */
     @Transactional
     fun changeNickname(authorization: String?, req: ChangeNicknameRequest): UserResponse {

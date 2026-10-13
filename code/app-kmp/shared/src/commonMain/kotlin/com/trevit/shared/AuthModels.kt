@@ -32,6 +32,9 @@ data class SendCodeRequest(val email: String)
 @Serializable
 data class VerifyCodeRequest(val email: String, val code: String)
 
+@Serializable
+data class ResetPasswordRequest(val email: String, val code: String, val newPassword: String)
+
 /** 회원 정보 — 비밀번호 관련 값은 담기지 않는다 */
 @Serializable
 data class UserDto(

@@ -276,6 +276,81 @@ class AuthState(
     }
 
     // ─────────────────────────────────────────────
+    // 비밀번호 찾기
+    // ─────────────────────────────────────────────
+
+    var resetEmail by mutableStateOf("")
+    var resetCode by mutableStateOf("")
+    var resetPassword by mutableStateOf("")
+    var resetPasswordConfirm by mutableStateOf("")
+
+    /** 인증번호를 보낸 뒤에만 번호·새 비밀번호 칸이 나타난다 */
+    var resetCodeSent by mutableStateOf(false)
+        private set
+
+    /** 재설정을 마쳤다 → 로그인 화면으로 돌아가며 안내를 띄운다 */
+    var resetDone by mutableStateOf(false)
+
+    suspend fun sendResetCode(): Boolean {
+        val email = resetEmail.trim()
+        if (!EMAIL_REGEX.matches(email)) {
+            errorMessage = t("auth.err.emailFormat")
+            return false
+        }
+        sendingCode = true
+        try {
+            return run(t("auth.action.sendCode")) {
+                val seconds = repository.sendResetCode(baseUrlProvider(), email)
+                resetCodeSent = true
+                codeSecondsLeft = seconds.toInt()
+                resendSecondsLeft = RESEND_COOLDOWN_SECONDS
+                resetCode = ""
+                // 가입하지 않은 주소면 메일이 오지 않는다 — 계정 존재 여부는 알려주지 않는다
+                setCodeMessage(t("auth.reset.sentHint"), isError = false)
+            }
+        } finally {
+            sendingCode = false
+        }
+    }
+
+    suspend fun resetPasswordSubmit(): Boolean {
+        val email = resetEmail.trim()
+        val problem = when {
+            !EMAIL_REGEX.matches(email) -> t("auth.err.emailFormat")
+            resetCode.length != 6 -> t("auth.code.need6")
+            !isPasswordStrong(resetPassword) -> t("auth.err.passwordWeak")
+            resetPassword != resetPasswordConfirm -> t("auth.err.passwordMismatch")
+            else -> null
+        }
+        if (problem != null) {
+            errorMessage = problem
+            return false
+        }
+        val ok = run(t("auth.action.reset")) {
+            repository.resetPassword(baseUrlProvider(), email, resetCode, resetPassword)
+        }
+        if (ok) {
+            loginEmail = email
+            loginPassword = ""
+            clearResetForm()
+            resetDone = true
+        }
+        return ok
+    }
+
+    fun clearResetForm() {
+        resetEmail = ""
+        resetCode = ""
+        resetPassword = ""
+        resetPasswordConfirm = ""
+        resetCodeSent = false
+        codeSecondsLeft = 0
+        resendSecondsLeft = 0
+        errorMessage = null
+        setCodeMessage(null, isError = false)
+    }
+
+    // ─────────────────────────────────────────────
     // 계정 설정 (설정 화면) — 성공하면 null, 실패하면 보여줄 오류 문구
     // ─────────────────────────────────────────────
 

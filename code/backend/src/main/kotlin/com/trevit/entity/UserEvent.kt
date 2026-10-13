@@ -42,6 +42,7 @@ class UserEvent(
         // 활동 (리텐션 계산용)
         const val LOGIN = "LOGIN"
         const val ACTIVE = "ACTIVE"                 // 로그인 상태로 앱을 연 날 (하루 한 번)
+        const val PASSWORD_RESET = "PASSWORD_RESET" // 비밀번호 찾기로 재설정
 
         // 시스템 상태
         const val MAIL_SENT = "MAIL_SENT"

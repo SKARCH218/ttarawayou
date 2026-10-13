@@ -32,7 +32,24 @@ class EmailVerificationService(
         require(email.isNotEmpty()) { "이메일을 입력해 주세요." }
         require(EMAIL_REGEX.matches(email)) { "이메일 형식이 올바르지 않아요." }
         require(!users.existsByEmail(email)) { "이미 가입된 이메일이에요." }
+        return issueCode(email, passwordReset = false)
+    }
 
+    /**
+     * 비밀번호 찾기 인증코드. 가입 여부를 알려주지 않기 위해, 가입되지 않았거나
+     * 비밀번호가 없는(구글) 계정이어도 똑같이 성공 응답만 하고 메일은 보내지 않는다.
+     * (가입용 코드와 같은 테이블을 쓰지만, 가입용은 미가입 주소에만 발급되므로 섞이지 않는다)
+     */
+    @Transactional
+    fun sendResetCode(rawEmail: String): Long {
+        val email = normalize(rawEmail)
+        require(EMAIL_REGEX.matches(email)) { "이메일 형식이 올바르지 않아요." }
+        val user = users.findByEmail(email)
+        if (user == null || user.passwordHash == null) return EmailVerification.CODE_TTL_MINUTES * 60
+        return issueCode(email, passwordReset = true)
+    }
+
+    private fun issueCode(email: String, passwordReset: Boolean): Long {
         val now = Instant.now()
         val existing = verifications.findById(email).orElse(null)
         if (existing != null) {
@@ -53,7 +70,7 @@ class EmailVerificationService(
             )
         )
         try {
-            mail.sendVerificationCode(email, code, EmailVerification.CODE_TTL_MINUTES)
+            mail.sendVerificationCode(email, code, EmailVerification.CODE_TTL_MINUTES, passwordReset)
         } catch (e: MailDeliveryException) {
             // 실패를 지표로 남겨 관리자 대시보드에 바로 보이게 한다 (발송 기록은 롤백돼 바로 재시도 가능)
             metrics.record(UserEvent.MAIL_FAILED)

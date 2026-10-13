@@ -28,7 +28,7 @@ class MailService(
      * - SMTP 설정됨 + 발송 실패: [MailDeliveryException] 을 던진다.
      *   예전엔 실패해도 로그만 남기고 "보냈다"고 응답해서, 메일이 9일간 안 나가는 걸 아무도 몰랐다.
      */
-    fun sendVerificationCode(email: String, code: String, ttlMinutes: Long) {
+    fun sendVerificationCode(email: String, code: String, ttlMinutes: Long, passwordReset: Boolean = false) {
         val sender = if (host.isNotBlank()) senderProvider.ifAvailable else null
         if (sender == null) {
             logFallback(email, code)
@@ -39,11 +39,11 @@ class MailService(
                 SimpleMailMessage().apply {
                     setFrom(from)
                     setTo(email)
-                    subject = "[트레빗] 인증번호 $code"
+                    subject = if (passwordReset) "[트레빗] 비밀번호 재설정 인증번호 $code" else "[트레빗] 인증번호 $code"
                     text = """
                         안녕하세요, 트레빗입니다.
 
-                        아래 인증번호를 회원가입 화면에 입력해 주세요.
+                        아래 인증번호를 ${if (passwordReset) "비밀번호 찾기" else "회원가입"} 화면에 입력해 주세요.
 
                             $code
 
