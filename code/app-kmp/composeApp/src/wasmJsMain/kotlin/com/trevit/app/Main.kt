@@ -4,6 +4,9 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateMapOf
 import com.trevit.app.ui.LocalCjkFontFamily
+import com.trevit.app.ui.LocalLanguageFonts
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import androidx.compose.runtime.getValue
 import com.trevit.app.i18n.AppLanguage
 import androidx.compose.runtime.mutableStateOf
@@ -79,17 +82,20 @@ fun main() {
             // 그래서 폰트를 먼저 받고, 다 받은 뒤에야 언어를 바꾸거나(설정) 앱을 그린다(시작).
             // 언어별 한자 폰트 (받은 것만). 화면 언어가 일본어·중국어면 이걸 앱 전체 기본 글꼴로 쓴다
             val cjkFamilies = remember { mutableStateMapOf<AppLanguage, FontFamily>() }
+            val cjkLock = remember { Mutex() }   // 시작 시 백그라운드 받기와 언어 변경이 겹쳐도 한 번만 받는다
             suspend fun ensureCjkFont(lang: AppLanguage) {
                 val file = when (lang) {
                     AppLanguage.JA -> "font/noto_sans_jp_regular.otf"
                     AppLanguage.ZH -> "font/noto_sans_sc_regular.otf"
                     else -> return
                 }
-                if (lang in cjkFamilies) return
-                val name = file.substringAfterLast('/').substringBefore('.')
-                val family = FontFamily(Font(name, Res.readBytes(file), FontWeight.Normal))
-                fontFamilyResolver.preload(family)
-                cjkFamilies[lang] = family
+                cjkLock.withLock {
+                    if (lang in cjkFamilies) return
+                    val name = file.substringAfterLast('/').substringBefore('.')
+                    val family = FontFamily(Font(name, Res.readBytes(file), FontWeight.Normal))
+                    fontFamilyResolver.preload(family)
+                    cjkFamilies[lang] = family
+                }
             }
             remember { state.defersLanguageChange = true }
 
@@ -106,9 +112,18 @@ fun main() {
                 runCatching { ensureCjkFont(state.language) }
                 startReady = true
             }
+            // 화면을 띄운 뒤 나머지 한자 폰트도 미리 받아 둔다 — 언어 목록의 "日本語"·"中文"이 □로 안 나오고,
+            // 언어를 바꿀 때 기다리지 않게 (한국어·영어 사용자도 받는다: 합계 약 12MB, 브라우저가 캐시)
+            LaunchedEffect(startReady) {
+                if (!startReady) return@LaunchedEffect
+                for (lang in listOf(AppLanguage.JA, AppLanguage.ZH)) runCatching { ensureCjkFont(lang) }
+            }
             if (startReady) {
                 // 기본 글꼴을 한자 폰트로 바꿔야, 폰트를 받기 전에 □로 그려 둔 글자까지 새로 그려진다
-                CompositionLocalProvider(LocalCjkFontFamily provides cjkFamilies[state.language]) {
+                CompositionLocalProvider(
+                    LocalCjkFontFamily provides cjkFamilies[state.language],
+                    LocalLanguageFonts provides cjkFamilies,
+                ) {
                     TrevitApp(state)
                 }
             }

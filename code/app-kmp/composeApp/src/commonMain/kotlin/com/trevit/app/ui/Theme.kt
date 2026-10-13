@@ -88,6 +88,12 @@ private val AppTypography: Typography = Typography()
  */
 val LocalCjkFontFamily = compositionLocalOf<FontFamily?> { null }
 
+/**
+ * 웹에서 받아 둔 언어별 한자 폰트 — 언어 목록의 "日本語", "中文"을 그 폰트로 직접 그리는 데 쓴다.
+ * (한국어 화면에선 한자 폰트가 기본 글꼴이 아니라서, 이름만큼은 따로 지정해야 □가 안 된다. 안드로이드는 빈 맵)
+ */
+val LocalLanguageFonts = compositionLocalOf<Map<com.trevit.app.i18n.AppLanguage, FontFamily>> { emptyMap() }
+
 private fun Typography.withFamily(f: FontFamily) = Typography(
     displayLarge = displayLarge.copy(fontFamily = f), displayMedium = displayMedium.copy(fontFamily = f),
     displaySmall = displaySmall.copy(fontFamily = f), headlineLarge = headlineLarge.copy(fontFamily = f),

@@ -12,7 +12,9 @@ ROOT="$(cd "$DIR/.." && pwd)"
 OUT="$DIR/trevit-deploy.tar.gz"
 STAGE="$(mktemp -d)/trevit-deploy"
 
-echo "[1/3] 백엔드 빌드 ..."
+echo "[1/3] 웹 + 백엔드 빌드 ..."
+# 웹을 먼저 빌드해야 백엔드 jar 의 static/ 에 최신 웹이 들어간다
+(cd "$ROOT/code/app-kmp" && ./gradlew :composeApp:wasmJsBrowserDistribution -q)
 (cd "$ROOT/code/backend" && ./gradlew bootJar -q)
 JAR=$(ls "$ROOT/code/backend/build/libs/"*-SNAPSHOT.jar | head -1)
 

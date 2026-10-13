@@ -53,6 +53,16 @@ log "배포 시작: ${LOCAL:0:7} → ${REMOTE:0:7}"
 : > "$BUILD_LOG"
 git reset --hard "origin/$BRANCH" >>"$BUILD_LOG" 2>&1
 
+# 웹(Compose wasm) 빌드 — 백엔드 jar 가 app-kmp/.../dist/wasmJs 결과물을 static/ 으로 담아 함께 서빙한다.
+# 예전엔 이 단계가 없어서, 서버에 남아 있던 옛 웹 빌드가 계속 배포됐다(앱만 고쳐지고 웹은 그대로).
+# 실패해도 백엔드 배포는 막지 않는다 — 이전 웹 결과물로 나가고, 경고를 남긴다.
+cd "$REPO/code/app-kmp" || exit 1
+if ./gradlew :composeApp:wasmJsBrowserDistribution --console=plain >>"$BUILD_LOG" 2>&1; then
+  log "웹 빌드 완료"
+else
+  log "경고: 웹 빌드 실패 — 이전 웹으로 배포한다. 로그: $BUILD_LOG"
+fi
+
 # 백엔드 jar 빌드
 cd "$REPO/code/backend" || exit 1
 if ! ./gradlew bootJar --console=plain >>"$BUILD_LOG" 2>&1; then

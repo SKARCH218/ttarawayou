@@ -40,6 +40,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -210,13 +211,18 @@ fun SettingsScreen(state: AppState) {
         SettingsDialog.Password -> PasswordDialog(state, close) { notice = it }
         SettingsDialog.Logout -> LogoutDialog(state, close)
         SettingsDialog.Withdraw -> WithdrawDialog(state, close)
-        SettingsDialog.Language -> ChoiceDialog(
-            title = tr("settings.language"),
-            options = AppLanguage.entries.map { it to it.nativeName },
-            selected = state.language,
-            onSelect = { state.changeLanguage(it); close() },
-            onDismiss = close,
-        )
+        SettingsDialog.Language -> {
+            val languageFonts = LocalLanguageFonts.current
+            ChoiceDialog(
+                title = tr("settings.language"),
+                options = AppLanguage.entries.map { it to it.nativeName },
+                selected = state.language,
+                onSelect = { state.changeLanguage(it); close() },
+                onDismiss = close,
+                // 웹: "日本語"·"中文"은 각 언어 폰트로 그린다 (지금 화면 언어의 글꼴엔 한자가 없을 수 있다)
+                labelFont = { languageFonts[it] },
+            )
+        }
         SettingsDialog.Theme -> ChoiceDialog(
             title = tr("settings.theme"),
             options = ThemeMode.entries.map { it to themeLabel(it) },
@@ -542,6 +548,7 @@ private fun <T> ChoiceDialog(
     selected: T,
     onSelect: (T) -> Unit,
     onDismiss: () -> Unit,
+    labelFont: (T) -> FontFamily? = { null },
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -566,7 +573,7 @@ private fun <T> ChoiceDialog(
                             colors = RadioButtonDefaults.colors(selectedColor = WebMint),
                         )
                         Spacer(Modifier.width(10.dp))
-                        Text(label, fontSize = 15.sp)
+                        Text(label, fontSize = 15.sp, fontFamily = labelFont(value))
                     }
                 }
             }
