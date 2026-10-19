@@ -29,6 +29,14 @@ class MainActivity : ComponentActivity() {
 
         // 멀티플랫폼 위치 조회에 쓸 컨텍스트 등록 + 위치 권한 요청
         AndroidAppContext.context = applicationContext
+        AndroidAppContext.requestLocationPermission = {
+            runOnUiThread {
+                requestPermissions(
+                    arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION),
+                    1001,
+                )
+            }
+        }
         if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(
                 arrayOf(

@@ -10,7 +10,9 @@ import android.os.Looper
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
-import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.coroutines.resume
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -18,6 +20,8 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 /** MainActivity에서 applicationContext를 넣어 둔다 (멀티플랫폼 위치 조회용) */
 object AndroidAppContext {
     var context: Context? = null
+    /** MainActivity 가 넣어 둔다 — 실시간 모드에서 권한이 없을 때 요청 창을 다시 띄운다 */
+    var requestLocationPermission: (() -> Unit)? = null
 }
 
 @SuppressLint("MissingPermission")
@@ -68,17 +72,28 @@ actual suspend fun getCurrentLocation(): Pair<Double, Double>? {
     return fresh?.let { it.latitude to it.longitude }
 }
 
-@SuppressLint("MissingPermission")
-actual fun locationUpdates(): Flow<Pair<Double, Double>> {
-    val ctx = AndroidAppContext.context ?: return emptyFlow()
-    val fine = ctx.checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION)
-    val coarse = ctx.checkSelfPermission(android.Manifest.permission.ACCESS_COARSE_LOCATION)
-    if (fine != PackageManager.PERMISSION_GRANTED && coarse != PackageManager.PERMISSION_GRANTED) {
-        return emptyFlow()
-    }
-    val lm = ctx.getSystemService(Context.LOCATION_SERVICE) as? LocationManager ?: return emptyFlow()
+private fun hasLocationPermission(ctx: Context): Boolean =
+    ctx.checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
+        ctx.checkSelfPermission(android.Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
 
-    return callbackFlow {
+/**
+ * 실시간 위치. 권한이 없으면 권한 요청 창을 다시 띄우고 허용될 때까지 기다린다
+ * (앱을 처음 켤 때 거절했어도 실시간 모드에서 다시 켤 수 있게).
+ * 시작하자마자 마지막으로 알려진 위치를 먼저 내보내 "GPS 대기"가 길지 않게 한다.
+ */
+@SuppressLint("MissingPermission")
+actual fun locationUpdates(): Flow<Pair<Double, Double>> = flow {
+    val ctx = AndroidAppContext.context ?: return@flow
+    if (!hasLocationPermission(ctx)) {
+        AndroidAppContext.requestLocationPermission?.invoke()
+        while (!hasLocationPermission(ctx)) delay(1_000)
+    }
+    val lm = ctx.getSystemService(Context.LOCATION_SERVICE) as? LocationManager ?: return@flow
+    listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER, LocationManager.PASSIVE_PROVIDER)
+        .mapNotNull { runCatching { lm.getLastKnownLocation(it) }.getOrNull() }
+        .maxByOrNull { it.time }
+        ?.let { emit(it.latitude to it.longitude) }
+    emitAll(callbackFlow {
         val listener = object : LocationListener {
             override fun onLocationChanged(location: Location) {
                 trySend(location.latitude to location.longitude)
@@ -93,5 +108,5 @@ actual fun locationUpdates(): Flow<Pair<Double, Double>> {
             .filter { runCatching { lm.isProviderEnabled(it) }.getOrDefault(false) }
             .forEach { lm.requestLocationUpdates(it, 1_000L, 1f, listener, Looper.getMainLooper()) }
         awaitClose { lm.removeUpdates(listener) }
-    }
+    })
 }
